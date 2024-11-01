@@ -2,6 +2,8 @@ import os
 import xml.etree.ElementTree as ET
 import re
 import textwrap
+from src.ShellPrinter import ShellPrinter  # Import the ShellPrinter class
+from colorama import Fore
 
 class XMLInjector:
     """
@@ -10,23 +12,31 @@ class XMLInjector:
 
     def __init__(self, export_dir):
         self.export_dir = export_dir
+        self.printer = ShellPrinter()
 
     def inject_text_in_xml(self, input_text, xml_file_name):
         if not input_text:
+            self.printer.error("Le texte d'entrée est vide ou None.")
             raise ValueError("Le texte d'entrée est vide ou None.")
 
         # Normalisation et vérification du chemin du fichier
         xml_file_path = os.path.normpath(os.path.join(self.export_dir, xml_file_name))
         if not os.path.exists(xml_file_path):
+            self.printer.error(f"Le fichier XML {xml_file_path} n'existe pas.")
             raise FileNotFoundError(f"Le fichier XML {xml_file_path} n'existe pas.")
 
         # Chargement et parsing du fichier XML
-        tree = ET.parse(xml_file_path)
+        try:
+            tree = ET.parse(xml_file_path)
+        except ET.ParseError as e:
+            self.printer.error(f"Erreur lors du parsing du fichier XML : {e}")
+            raise ValueError(f"Erreur lors du parsing du fichier XML : {e}")
         root = tree.getroot()
 
         # Navigation vers la section <Data> où les entrées doivent être ajoutées
         data_section = root.find('Data')
         if data_section is None:
+            self.printer.error("La section <Data> est manquante dans le fichier XML.")
             raise ValueError("La section <Data> est manquante dans le fichier XML.")
 
         # Division du texte d'entrée en segments sans couper les mots
@@ -57,7 +67,7 @@ class XMLInjector:
             entry_text = data_section.find(f'entry{i}')
             if entry_text is not None and "todo" in entry_text.text.lower() and segments_processed < len(input_text_segments):
                 entry_text.text = input_text_segments[segments_processed]
-                print(f"L'entrée TODO (entry{i}) a été remplacée par le texte complet.")
+                self.printer.success(f"L'entrée TODO (entry{i}) a été remplacée par le texte complet.")
                 todo_found = True
                 segments_processed += 1
 
@@ -68,15 +78,19 @@ class XMLInjector:
             new_date.text = last_date_text  # Utiliser la dernière date connue
             new_entry = ET.SubElement(data_section, f'entry{current_entry_number}')
             new_entry.text = input_text_segments[segments_processed]
-            print(f"Nouvelle entrée XML ajoutée avec ID {current_entry_number}.")
+            self.printer.info(f"Nouvelle entrée XML ajoutée avec ID {current_entry_number}.")
             segments_processed += 1
 
         # Mettre à jour la balise <NumberOfEntries> dans la section <Data>
         self.update_number_of_entries(data_section)
 
         # Sauvegarde des changements dans le fichier XML
-        tree.write(xml_file_path, encoding='utf-8', xml_declaration=True)
-        print("L'injection dans le XML a été réalisée avec succès.")
+        try:
+            tree.write(xml_file_path, encoding='utf-8', xml_declaration=True)
+            self.printer.success("L'injection dans le XML a été réalisée avec succès.")
+        except ET.ParseError as e:
+            self.printer.error(f"Erreur lors de l'écriture du fichier XML : {e}")
+            raise ValueError(f"Erreur lors de l'écriture du fichier XML : {e}")
 
     def update_number_of_entries(self, data_section):
         """Update the <NumberOfEntries> in the <Data> section."""
@@ -84,8 +98,9 @@ class XMLInjector:
         number_of_entries_element = data_section.find('NumberOfEntries')
         if number_of_entries_element is not None:
             number_of_entries_element.text = str(number_of_entries)
+            self.printer.info(f"Mise à jour de <NumberOfEntries> à {number_of_entries}.")
         else:
             # Si <NumberOfEntries> n'existe pas, l'ajouter à <Data>
             number_of_entries_element = ET.SubElement(data_section, 'NumberOfEntries')
             number_of_entries_element.text = str(number_of_entries)
-
+            self.printer.info(f"Ajout de la balise <NumberOfEntries> avec la valeur {number_of_entries}.")

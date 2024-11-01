@@ -5,12 +5,14 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="845ac05c-db54-41de-bbe4-f7cbefb2f3b2" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/TNFCDataInjector_v2.iml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Main.py" beforeDir="false" afterPath="$PROJECT_DIR$/Main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/DataExtractor.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/DataExtractor.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/FileChooser.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/FileChooser.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/JSONInjector.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/JSONInjector.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/LorePlexum.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/LorePlexum.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/XMLInjector.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/XMLInjector.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -42,7 +44,7 @@
   "keyToString": {
     "Python.Main.executor": "Run",
     "RunOnceActivity.ShowReadmeOnStart": "true",
-    "git-widget-placeholder": "master",
+    "git-widget-placeholder": "main",
     "last_opened_file_path": "D:/Projects/Python/TNFCDataInjector_v2",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
@@ -130,7 +132,7 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1730484243537</updated>
-      <workItem from="1730484246511" duration="5746000" />
+      <workItem from="1730484246511" duration="7265000" />
     </task>
     <servers />
   </component>
