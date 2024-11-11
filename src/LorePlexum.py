@@ -11,31 +11,31 @@ class TNFCDataInjector:
     """
     Main class that orchestrates all operations related to file handling and data injection.
     """
+
     def __init__(self):
-        # Initialize the printer for output
+        # Initialisation du gestionnaire de messages
         self.printer = ShellPrinter()
 
-        # Load environment variables
+        # Chargement des chemins et du format d'injection depuis l'environnement
         env_loader = EnvLoader()
-        paths = env_loader.get_paths()
+        paths_and_format = env_loader.get_paths_and_format()
 
-        # Instantiate other classes
+        # Initialisation des chemins de répertoires
+        self.entries_dir = paths_and_format['entries_dir']
+        self.metadatas_dir = paths_and_format['metadatas_dir']
+
+        # Choix de l'injecteur basé sur le format spécifié (JSON ou TXT)
+        self.injection_format = paths_and_format['injection_format']
+        if self.injection_format == 'JSON':
+            self.injector = JSONInjector(paths_and_format['full_context_json_path'])
+            self.printer.info("Mode d'injection : JSON")
+        else:
+            self.injector = TXTInjector(paths_and_format['full_context_txt_path'], self.metadatas_dir)
+            self.printer.info("Mode d'injection : TXT")
+
+        # Initialisation du sélecteur de fichiers et de l'extracteur de données
         self.file_chooser = FileChooser()
         self.data_extractor = DataExtractor()
-        self.xml_injector = XMLInjector(paths['take_notes_export_dir'])
-        self.json_injector = JSONInjector(paths['full_context_json_path'])
-
-        self.entries_dir = paths['entries_dir']
-        self.metadatas_dir = paths['metadatas_dir']
-
-        # Mapping of categories to XML files
-        self.xml_files_mapping = {
-            'journal': 'ExportChapter1.xml',
-            'bestiaire': 'ExportChapter2.xml',
-            'quetes': 'ExportChapter3.xml',
-            'personnages': 'ExportChapter4.xml',
-            'divers': 'ExportChapter5.xml'
-        }
 
     def choose_category(self):
         """
@@ -91,3 +91,11 @@ class TNFCDataInjector:
 
         except Exception as e:
             self.printer.error(f"Une erreur s'est produite : {e}")
+
+
+    def inject_txt(self):
+        """
+        Injection process specifically for TXT format.
+        """
+        # Injection directe dans full_context.txt en sélectionnant le fichier de métadonnées
+        self.injector.inject_metadata_file()
