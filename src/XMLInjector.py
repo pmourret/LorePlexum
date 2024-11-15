@@ -97,7 +97,7 @@ class XMLInjector:
         number_of_entries = len([elem for elem in data_section if re.match(r'entry\d+', elem.tag)])
         number_of_entries_element = data_section.find('NumberOfEntries')
         if number_of_entries_element is not None:
-            number_of_entries_element.text = str(number_of_entries)
+            number_of_entries_element.text = str(number_of_entries + 1)
             self.printer.info(f"Mise à jour de <NumberOfEntries> à {number_of_entries}.")
         else:
             # Si <NumberOfEntries> n'existe pas, l'ajouter à <Data>
