@@ -1,9 +1,12 @@
+import os
+
 from src.DataExtractor import DataExtractor
 from src.EnvLoader import EnvLoader
 from src.FileChooser import FileChooser
 from src.JSONInjector import JSONInjector
 from src.XMLInjector import XMLInjector
 from src.ShellPrinter import ShellPrinter  # Import the ShellPrinter class
+from src.PDFExtractor import PDFGenerator
 from colorama import Fore
 
 
@@ -62,6 +65,7 @@ class TNFCDataInjector:
         try:
             # Choisir une catégorie et obtenir le nom du fichier XML associé
             xml_file_name = self.choose_category()
+            xml_file_path = os.path.join(self.xml_injector.export_dir, xml_file_name)
 
             # Choisir un fichier texte et en extraire les sections
             text_file_path = self.file_chooser.choose_file_from_dir(self.entries_dir)
@@ -89,5 +93,16 @@ class TNFCDataInjector:
 
             self.printer.success("Le processus d'injection a été terminé avec succès.")
 
+            self.printer.info("Génération du PDF.")
+
+            try:
+                pdf_output_path = os.getenv("PDF_OUTPUT_PATH", "output/Journal_Entries_By_Date.pdf")
+                pdf_generator = PDFGenerator(xml_file_path, pdf_output_path)
+                pdf_generator.run()
+            except Exception as e:
+                self.printer.error(f"Problème lors de la génération du PDF : {e}")
+
+
         except Exception as e:
             self.printer.error(f"Une erreur s'est produite : {e}")
+
