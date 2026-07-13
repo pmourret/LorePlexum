@@ -1,0 +1,41 @@
+<p class="muted count">{{ total }} injection(s){% if f_categorie or f_arc or f_search %} (filtré){% endif %}</p>
+
+{% if items %}
+<table class="table">
+    <thead>
+        <tr>
+            <th>#</th><th>Date d'injection</th><th>Catégorie</th><th>Arc</th>
+            <th>Entrée</th><th>Date session</th><th>Résumé</th><th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for it in items %}
+        <tr>
+            <td>{{ it.id }}</td>
+            <td class="nowrap">{{ it.date_injection }}</td>
+            <td><span class="tag">{{ it.categorie }}</span></td>
+            <td>{{ it.arc }}</td>
+            <td>#{{ it.entry_number }}</td>
+            <td class="nowrap">{{ it.date_session }}</td>
+            <td class="ellipsis">{{ (it.resume or it.texte or "")[:80] }}</td>
+            <td><a class="btn small" href="/injection/{{ it.id }}">Détail</a></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% if total_pages > 1 %}
+<div class="pager">
+    {% if page > 1 %}
+    <a class="btn small" href="/history?categorie={{ f_categorie }}&arc={{ f_arc }}&search={{ f_search }}&page={{ page - 1 }}">← Précédent</a>
+    {% endif %}
+    <span class="muted">Page {{ page }} / {{ total_pages }}</span>
+    {% if page < total_pages %}
+    <a class="btn small" href="/history?categorie={{ f_categorie }}&arc={{ f_arc }}&search={{ f_search }}&page={{ page + 1 }}">Suivant →</a>
+    {% endif %}
+</div>
+{% endif %}
+
+{% else %}
+<p class="muted empty">Aucune injection enregistrée{% if f_categorie or f_arc or f_search %} pour ces filtres{% endif %}.</p>
+{% endif %}

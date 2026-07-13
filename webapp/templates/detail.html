@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Injection #{{ item.id if item }} — Abyssiaelle{% endblock %}
+{% block content %}
+<p><a class="btn small" href="/history">← Retour à l'historique</a></p>
+
+{% if not item %}
+<div class="alert error">❌ Injection introuvable.</div>
+{% else %}
+<h1>Injection #{{ item.id }}</h1>
+
+<div class="card meta-grid">
+    <div><span class="k">Date d'injection</span>{{ item.date_injection }}</div>
+    <div><span class="k">Catégorie</span><span class="tag">{{ item.categorie }}</span></div>
+    <div><span class="k">Arc</span>{{ item.arc }}</div>
+    <div><span class="k">N° d'entrée</span>#{{ item.entry_number }}</div>
+    <div><span class="k">Date de session</span>{{ item.date_session }}</div>
+    <div><span class="k">Fichier XML</span>{{ item.xml_file }}</div>
+</div>
+
+{% if item.pdf_path %}
+<p><a class="btn small" href="/pdf/{{ item.id }}">📄 Télécharger le PDF</a>
+   <span class="muted">{{ item.pdf_path }}</span></p>
+{% endif %}
+
+{% if item.resume %}
+<h2>Résumé</h2>
+<div class="card text-block">{{ item.resume }}</div>
+{% endif %}
+
+<h2>Texte injecté</h2>
+<div class="card text-block">{{ item.texte }}</div>
+
+{% if metadata_pretty %}
+<h2>Métadonnées</h2>
+<pre class="card code">{{ metadata_pretty }}</pre>
+{% endif %}
+{% endif %}
+{% endblock %}

@@ -1,9 +1,14 @@
 # TNFCDataInjector — Projet Abyssiaelle
 
-Outil en ligne de commande qui réinjecte un texte de journal enrichi (issu d'une
+**Application web locale** qui réinjecte un texte de journal enrichi (issu d'une
 session de jeu **Skyrim** annotée via le mod **TakeNotes**) à la fois dans un JSON
 de contexte narratif complet et dans le fichier XML d'export TakeNotes de la
-catégorie choisie, puis génère un PDF récapitulatif du journal.
+catégorie choisie, génère un PDF récapitulatif du journal, et **archive chaque
+injection en base de données** (historique cherchable, détection des doublons).
+
+> Depuis la version 0.3.0, l'outil s'utilise via une **interface web** (FastAPI +
+> HTMX). L'ancienne interface en ligne de commande est conservée mais **dépréciée**
+> (voir [Interface en ligne de commande (dépréciée)](#interface-en-ligne-de-commande-dépréciée)).
 
 ---
 
@@ -14,10 +19,12 @@ catégorie choisie, puis génère un PDF récapitulatif du journal.
 - [Prérequis](#prérequis)
 - [Installation](#installation)
 - [Configuration (`.env`)](#configuration-env)
-- [Utilisation](#utilisation)
+- [Utilisation (interface web)](#utilisation-interface-web)
+- [Archivage et détection de doublons](#archivage-et-détection-de-doublons)
 - [Format des fichiers d'entrée](#format-des-fichiers-dentrée)
 - [Catégories et fichiers XML](#catégories-et-fichiers-xml)
 - [Sorties générées](#sorties-générées)
+- [Interface en ligne de commande (dépréciée)](#interface-en-ligne-de-commande-dépréciée)
 - [Dépannage](#dépannage)
 
 ---
@@ -28,10 +35,11 @@ catégorie choisie, puis génère un PDF récapitulatif du journal.
 2. **Prise de notes in-game** via le mod TakeNotes → export au format XML.
 3. **Enrichissement narratif** du texte par une IA (Grok) → texte formaté avec des
    sections `Resume :` et `Text :`.
-4. **Exécution de ce script** → réinjecte le texte enrichi :
+4. **Injection via l'interface web** → réinjecte le texte enrichi :
    - dans `full_context.json` (structure `character_arc > arc > journals`) ;
    - dans le fichier XML d'export TakeNotes de la catégorie choisie.
 5. **Génération d'un PDF** récapitulatif du journal à partir du XML.
+6. **Archivage en base** de l'injection (historique + empreinte anti-doublon).
 
 > ⚠️ Le JSON n'est sauvegardé sur disque **qu'après** le succès de l'injection XML,
 > afin que les deux fichiers ne divergent jamais silencieusement.
@@ -40,17 +48,41 @@ catégorie choisie, puis génère un PDF récapitulatif du journal.
 
 ## Architecture
 
+Le cœur métier est **découplé de toute interface** : il ne lit jamais le clavier et
+n'imprime jamais dans un terminal. Toutes les décisions (catégorie, arc, date…)
+sont des paramètres, et les messages sont *rapportés* à un `Reporter`. Le même cœur
+sert donc l'interface web et l'adaptateur CLI.
+
+### Cœur métier (`src/`)
+
 | Fichier | Responsabilité |
 |---|---|
-| `Main.py` | Point d'entrée. Boucle d'exécution. |
-| `src/LorePlexum.py` (`TNFCDataInjector`) | Orchestrateur du pipeline. |
+| `src/InjectionService.py` | **Orchestrateur** du pipeline. Reçoit un `InjectionRequest`, renvoie un `InjectionResult` (succès, logs, n° d'entrée, PDF, doublon). Point d'entrée unique du web et du CLI. |
+| `src/Reporter.py` | Collecte les messages `(niveau, texte)` du pipeline (écho console optionnel). Remplace `ShellPrinter` dans le métier. |
+| `src/Database.py` (`InjectionDatabase`) | Archivage SQLite des injections + détection de doublons (empreinte SHA-256). |
 | `src/EnvLoader.py` | Chargement / validation des variables d'environnement (`.env`). |
-| `src/FileChooser.py` | Sélection interactive d'un fichier dans un dossier. |
-| `src/DataExtractor.py` | Extraction des sections `Resume :` / `Text :` d'un fichier texte. |
-| `src/JSONInjector.py` | Chargement, injection et sauvegarde du JSON de contexte complet. |
-| `src/XMLInjector.py` | Injection du texte dans le XML d'export TakeNotes. |
+| `src/DataExtractor.py` | Extraction des sections `Resume :` / `Text :` d'un texte. |
+| `src/JSONInjector.py` | Chargement, injection et sauvegarde du JSON de contexte. `list_arcs()` / `resolve_arc()`. |
+| `src/XMLInjector.py` | Injection du texte dans le XML TakeNotes. Date et segmentation en paramètres ; `get_last_date()`. |
 | `src/PDFExtractor.py` (`PDFGenerator`) | Génère un PDF récapitulatif à partir du XML. |
-| `src/ShellPrinter.py` | Affichage coloré / emoji dans le terminal. |
+| `src/FileChooser.py` | Utilitaire `list_files()` (listing d'un dossier). |
+
+### Interface web (`webapp/`)
+
+| Fichier | Responsabilité |
+|---|---|
+| `webapp/main.py` | Application FastAPI : routes `Injecter`, `Historique`, `Détail`, `Paramètres`. |
+| `webapp/settings.py` | Lecture / écriture / validation du `.env` depuis la page Paramètres. |
+| `webapp/templates/` | Gabarits Jinja2 (HTMX pour l'interactivité sans rechargement). |
+| `webapp/static/` | Feuille de style (thème « grimoire ») et HTMX vendorisé (hors-ligne). |
+
+### Interface en ligne de commande (dépréciée)
+
+| Fichier | Responsabilité |
+|---|---|
+| `Main.py` | Point d'entrée CLI (boucle d'exécution). |
+| `src/LorePlexum.py` (`TNFCDataInjector`) | Adaptateur CLI : collecte les saisies console puis délègue à `InjectionService`. |
+| `src/ShellPrinter.py` | Affichage coloré / emoji dans le terminal (utilisé par le CLI uniquement). |
 
 ---
 
@@ -62,6 +94,8 @@ catégorie choisie, puis génère un PDF récapitulatif du journal.
   - Téléchargement : <https://wkhtmltopdf.org/downloads.html>
   - Sous Windows, il doit être accessible dans le `PATH` (chemin par défaut :
     `C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe`).
+  - En son absence, l'injection réussit quand même ; seule la génération du PDF
+    échoue (signalée dans le journal d'exécution, non bloquante).
 
 ---
 
@@ -76,27 +110,32 @@ pip install -r requirements.txt
 
 Dépendances Python (voir `requirements.txt`) :
 
-- `colorama` — couleurs terminal (compatibilité Windows)
-- `emoji` — emojis dans les messages
-- `python-dotenv` — chargement du `.env`
+- `fastapi`, `uvicorn`, `jinja2`, `python-multipart` — interface web
 - `pdfkit` — génération PDF (nécessite **wkhtmltopdf**, cf. [Prérequis](#prérequis))
+- `python-dotenv` — chargement du `.env`
+- `colorama`, `emoji`, `pyperclip` — utilisés par l'adaptateur CLI déprécié
+
+HTMX est **vendorisé** dans `webapp/static/htmx.min.js` : aucune connexion Internet
+n'est requise pour utiliser l'interface.
 
 ---
 
 ## Configuration (`.env`)
 
-Créez un fichier **`.env`** à la racine (le fichier doit s'appeler exactement `.env`
-pour que `load_dotenv()` le trouve). Un gabarit est fourni dans `.env.struct`.
+La configuration se fait désormais depuis la page **Paramètres** de l'interface web,
+qui lit et écrit le fichier `.env` à la racine et **valide en direct** l'existence
+des chemins. Un gabarit est fourni dans `.env.struct`.
 
 | Variable | Obligatoire | Description |
 |---|:---:|---|
 | `FULL_CONTEXT_JSON_PATH` | ✅ | Chemin du JSON de contexte complet (`full_context.json`). |
-| `ENTRIES_DIR` | ✅ | Dossier contenant les fichiers texte enrichis à injecter. |
+| `ENTRIES_DIR` | ✅ | Dossier contenant les fichiers texte enrichis. |
 | `METADATAS_DIR` | ✅ | Dossier contenant les fichiers JSON de métadonnées. |
 | `TAKE_NOTES_EXPORT_DIR` | ✅ | Dossier des exports XML TakeNotes (`ExportChapterN.xml`). |
-| `PDF_OUTPUT_PATH` | — | Dossier de sortie du PDF (défaut : `output/Journal_Entries_By_Date.pdf`). |
+| `PDF_OUTPUT_PATH` | — | Dossier de sortie du PDF (défaut : `output/`). |
 | `PDF_EXPORT_FILE` | — | Préfixe du nom de fichier PDF (le suffixe `_AAAA-MM-JJ.pdf` est ajouté). |
 | `MAX_TOKENS_PER_ENTRY` | — | Largeur max d'un segment de texte XML (défaut : `500`). |
+| `DATABASE_PATH` | — | Emplacement de la base d'archivage SQLite (défaut : `data/injections.db`). |
 
 Exemple :
 
@@ -112,41 +151,80 @@ PDF_EXPORT_FILE=ENTRIES
 
 ---
 
-## Utilisation
+## Utilisation (interface web)
 
 ```powershell
-python Main.py
+.\run_web.ps1
 ```
 
-Ou via le script fourni (active le venv puis lance le script) :
+Le script active le venv, démarre le serveur et ouvre le navigateur sur
+<http://127.0.0.1:8000/>. Alternativement :
 
 ```powershell
-.\run_tnfc.ps1
+python -m uvicorn webapp.main:app --host 127.0.0.1 --port 8000
 ```
 
-Le script est **interactif** et vous guide étape par étape :
+L'interface comporte trois pages :
 
-1. **Choix de la catégorie** (`journal`, `bestiaire`, `quetes`, `personnages`, `divers`).
-2. **Choix du fichier texte** à injecter (dans `ENTRIES_DIR`).
-3. **Choix de l'arc** narratif dans le JSON (ou création d'un nouvel arc).
-4. **Choix du fichier de métadonnées** (dans `METADATAS_DIR`).
-5. **Saisie de la date** de la session pour l'entrée (la dernière date connue est
-   proposée par défaut ; appuyez sur Entrée pour la réutiliser). La date suit le
-   calendrier du jeu, ex. `Evening Star, 15th, 4E 201`.
-6. Injection JSON + XML, puis génération du PDF.
+### 1. Injecter
 
-La boucle recommence après chaque injection ; fermez la fenêtre pour quitter.
+Un formulaire unique regroupe tous les choix (jadis des questions successives dans
+le terminal) :
+
+1. **Catégorie** (`journal`, `bestiaire`, `quetes`, `personnages`, `divers`).
+2. **Texte enrichi** collé directement dans la zone de texte (sections `Resume :`
+   optionnelle et `Text :` obligatoire).
+3. **Arc** narratif : sélection d'un arc existant, ou saisie d'un nom pour créer un
+   nouvel arc (laisser vide = nouvel arc auto-numéroté).
+4. **Métadonnées** : choix d'un fichier du dossier `METADATAS_DIR`, **ou** JSON
+   collé directement.
+5. **Date de la session** (calendrier du jeu, ex. `Evening Star, 15th, 4E 201`),
+   pré-remplie avec la dernière date connue de la catégorie.
+
+Le bouton **Injecter** exécute JSON + XML + PDF et affiche le **journal d'exécution**
+coloré ainsi qu'un lien de téléchargement du PDF. Si le `.env` est invalide, la page
+affiche un avertissement et renvoie vers **Paramètres** (aucun plantage).
+
+### 2. Historique
+
+Tableau de toutes les injections archivées, **filtrable en direct** par catégorie,
+arc et recherche plein-texte (résumé / texte), avec pagination. Chaque ligne ouvre
+une **page de détail** (texte injecté complet, métadonnées, lien PDF).
+
+### 3. Paramètres
+
+Édition du `.env` avec validation en direct : chaque chemin obligatoire est marqué
+✅ (existe) ou ❌ (introuvable), en remplacement de l'édition manuelle du fichier.
+
+---
+
+## Archivage et détection de doublons
+
+Chaque injection réussie est enregistrée dans une base **SQLite** locale
+(`data/injections.db` par défaut) : catégorie, arc, n° d'entrée, date de session,
+résumé, texte, métadonnées, fichier XML, chemin PDF et **empreinte SHA-256** du
+texte injecté.
+
+Avant toute écriture, l'empreinte du texte est comparée à celles déjà archivées :
+
+- **Texte inédit** → injection normale.
+- **Texte déjà injecté** → un avertissement indique la date et l'entrée existante,
+  **et rien n'est écrit**. L'injection n'a lieu qu'après confirmation explicite via
+  le bouton **« Injecter malgré tout »**.
+
+La base est locale et ignorée par Git (`/data/`, `*.db`). Elle vit hors des partages
+réseau où résident les JSON/XML.
 
 ---
 
 ## Format des fichiers d'entrée
 
-### Fichier texte (`ENTRIES_DIR`)
+### Texte enrichi
 
 Deux sections attendues. `Resume :` est **optionnel** (un avertissement s'affiche
 s'il est absent) ; `Text :` est **obligatoire**. Les labels tolèrent les accents et
 la casse (`Resume`/`Résumé`, `Text`/`Texte`). Chaque section se termine à la
-première ligne vide (double saut de ligne) ou en fin de fichier.
+première ligne vide (double saut de ligne) ou en fin de contenu.
 
 ```text
 Resume : Bref résumé de l'entrée, une ou deux phrases.
@@ -158,7 +236,8 @@ Text : Corps complet du journal, enrichi narrativement.
 
 Un JSON libre décrivant le contexte de la scène (personnage, environnement,
 émotions, détails sensoriels, conséquences…). Il est stocké tel quel dans le champ
-`metadata` de l'entrée JSON.
+`metadata` de l'entrée JSON. Dans l'interface web, il peut aussi être **collé
+directement** au lieu d'être choisi parmi les fichiers.
 
 ---
 
@@ -186,6 +265,26 @@ longs sont découpés en segments (`MAX_TOKENS_PER_ENTRY`) sans couper les mots.
 - **Fichier XML de la catégorie** — nouvelles entrées datées.
 - **PDF** — récapitulatif du journal regroupé par date, dans `PDF_OUTPUT_PATH`,
   nommé `<PDF_EXPORT_FILE>_<AAAA-MM-JJ>.pdf`.
+- **Base d'archivage** — une ligne par injection dans `data/injections.db`.
+
+---
+
+## Interface en ligne de commande (dépréciée)
+
+L'ancienne interface interactive reste fonctionnelle mais **est dépréciée** au
+profit de l'interface web ; elle sera retirée dans une version ultérieure.
+
+```powershell
+python Main.py
+# ou
+.\run_tnfc.ps1
+```
+
+Elle guide l'utilisateur par une série de questions dans le terminal (catégorie,
+source du texte — presse-papiers ou fichier —, arc, métadonnées, date), puis
+exécute exactement le même pipeline que le web (via `InjectionService`). Le CLI gère
+en plus l'archivage sur disque des fichiers traités (sous-dossiers `_traités/`), qui
+n'a pas d'équivalent côté web.
 
 ---
 
@@ -193,9 +292,10 @@ longs sont découpés en segments (`MAX_TOKENS_PER_ENTRY`) sans couper les mots.
 
 | Symptôme | Cause probable / solution |
 |---|---|
-| `Une ou plusieurs variables d'environnement sont manquantes` | Vérifier le `.env` (nom exact, variables obligatoires renseignées). |
-| Échec de génération du PDF | **wkhtmltopdf** non installé ou absent du `PATH` (cf. [Prérequis](#prérequis)). |
-| `Texte après 'Text :' non trouvé` | Le fichier texte n'a pas de section `Text :`. |
+| La page Injecter affiche un avertissement de configuration | Un ou plusieurs chemins du `.env` sont vides ou introuvables. Corrigez-les dans **Paramètres** (les champs fautifs sont marqués ❌). |
+| Échec de génération du PDF | **wkhtmltopdf** non installé ou absent du `PATH` (cf. [Prérequis](#prérequis)). L'injection réussit malgré tout. |
+| « Doublon détecté » alors que je veux réinjecter | Le texte a déjà été archivé. Utilisez **« Injecter malgré tout »** pour forcer. |
+| `Texte après 'Text :' non trouvé` | Le contenu collé n'a pas de section `Text :`. |
 | Le résumé est vide | Section `Resume :` absente (avertissement, non bloquant). |
 | `Le fichier XML ... n'existe pas` | `TAKE_NOTES_EXPORT_DIR` incorrect ou fichier `ExportChapterN.xml` manquant. |
-| Erreur d'encodage des emojis dans un flux redirigé | La console doit être en UTF-8 ; en usage normal (terminal PowerShell) l'affichage fonctionne. |
+| Le port 8000 est déjà utilisé | Lancez Uvicorn sur un autre port : `--port 8001`. |

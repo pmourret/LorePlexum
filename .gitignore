@@ -1,6 +1,9 @@
 # --- Données locales du projet ---
 /input/
 /output/
+# Base d'archivage des injections (SQLite, générée localement).
+/data/
+*.db
 
 # --- Environnements virtuels ---
 /venv/

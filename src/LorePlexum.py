@@ -1,51 +1,51 @@
-import os
+"""Adaptateur CLI (transitoire) au-dessus de InjectionService.
 
-from src.DataExtractor import DataExtractor
+Le cœur métier est désormais découplé du terminal (voir InjectionService). Cette
+classe ne fait plus QUE de l'interaction console : elle collecte les choix de
+l'utilisateur (catégorie, source du texte, arc, métadonnées, date), puis délègue
+l'exécution au service, exactement comme le fera l'interface web.
+
+Les préoccupations purement "fichiers + terminal" (copie du presse-papiers,
+archivage des fichiers traités) restent ici, car elles n'ont pas de sens côté web.
+"""
+
+import os
+import shutil
+from datetime import datetime
+
+import pyperclip
+from colorama import Fore
+
 from src.EnvLoader import EnvLoader
 from src.FileChooser import FileChooser
-from src.JSONInjector import JSONInjector
-from src.XMLInjector import XMLInjector
-from src.ShellPrinter import ShellPrinter  # Import the ShellPrinter class
-from src.PDFExtractor import PDFGenerator
-from colorama import Fore
+from src.ShellPrinter import ShellPrinter
+from src.Reporter import Reporter
+from src.InjectionService import InjectionService, InjectionRequest, XML_FILES_MAPPING
+
+# Sous-dossier d'archivage des fichiers traités, commun aux entrées et aux métadonnées.
+ARCHIVE_SUBDIR = "_traités"
 
 
 class TNFCDataInjector:
-    """
-    Main class that orchestrates all operations related to file handling and data injection.
-    """
+    """Boucle interactive du CLI. Toute la logique d'injection vit dans le service."""
+
     def __init__(self):
-        # Initialize the printer for output
         self.printer = ShellPrinter()
 
-        # Load environment variables
-        env_loader = EnvLoader()
-        paths = env_loader.get_paths()
+        env = EnvLoader()
+        self.paths = env.get_paths()
+        self.entries_dir = self.paths['entries_dir']
+        self.metadatas_dir = self.paths['metadatas_dir']
 
-        # Instantiate other classes
-        self.file_chooser = FileChooser()
-        self.data_extractor = DataExtractor()
-        self.xml_injector = XMLInjector(paths['take_notes_export_dir'])
-        self.json_injector = JSONInjector(paths['full_context_json_path'])
-
-        self.entries_dir = paths['entries_dir']
-        self.metadatas_dir = paths['metadatas_dir']
-
-        # Mapping of categories to XML files
-        self.xml_files_mapping = {
-            'journal': 'ExportChapter1.xml',
-            'bestiaire': 'ExportChapter2.xml',
-            'quetes': 'ExportChapter3.xml',
-            'personnages': 'ExportChapter4.xml',
-            'divers': 'ExportChapter5.xml'
-        }
+        # Reporter avec écho console : les logs du service s'affichent en direct.
+        self.reporter = Reporter(echo=True)
+        self.service = InjectionService(
+            self.paths, pdf_export_file=env.pdf_export_file, reporter=self.reporter
+        )
 
     def choose_category(self):
-        """
-        Prompts the user to choose a category from a list and returns the corresponding XML file mapping.
-        """
         self.printer.info("Choisissez une catégorie :")
-        categories = list(self.xml_files_mapping.keys())
+        categories = self.service.list_categories()
         for i, category in enumerate(categories, start=1):
             self.printer.custom_print(f"{i}. {category}", color=Fore.CYAN)
 
@@ -54,58 +54,134 @@ class TNFCDataInjector:
             choice_index = int(choice) - 1
             if choice_index < 0 or choice_index >= len(categories):
                 raise ValueError
-            selected_category = categories[choice_index]
-            return self.xml_files_mapping[selected_category]
+            return categories[choice_index]
         except ValueError:
             self.printer.error("Choix invalide.")
             raise ValueError("Choix invalide.")
 
-    def run_injection(self):
-        """Main method to run the injection process."""
+    def choose_entry_source(self):
+        """True = presse-papiers (défaut), False = fichier existant."""
+        self.printer.info("Source du texte enrichi :")
+        self.printer.custom_print("1. Utiliser le presse-papiers (par défaut)", color=Fore.CYAN)
+        self.printer.custom_print("2. Choisir un fichier existant", color=Fore.CYAN)
+        choice = self.printer.user_input("Choix (Entrée = presse-papiers) : ").strip()
+        return choice != "2"
+
+    def get_raw_text(self):
+        """Renvoie (raw_text, fichier_à_archiver).
+
+        - Presse-papiers : contenu tracé immédiatement dans _traités/, rien à archiver.
+        - Fichier : on renvoie son chemin pour archivage après succès.
+        """
+        if self.choose_entry_source():
+            content = pyperclip.paste()
+            if not content or not content.strip():
+                self.printer.error("Le presse-papiers est vide.")
+                raise ValueError("Le presse-papiers est vide.")
+            self._save_clipboard_copy(content)
+            return content, None
+
+        text_file_path = self._choose_file(self.entries_dir)
+        with open(text_file_path, 'r', encoding='utf-8') as f:
+            return f.read(), text_file_path
+
+    def choose_arc(self):
+        """Menu de sélection d'arc. Entrée -> nouvel arc (renvoie None)."""
+        arcs = self.service.list_arcs()
+        if not arcs:
+            self.printer.info("Aucun arc existant. Un nouvel arc sera créé.")
+            return None
+        self.printer.info("Choisissez un arc pour l'injection :")
+        for i, arc in enumerate(arcs, start=1):
+            self.printer.custom_print(f"{i}. {arc}", color=Fore.CYAN)
+        choice = self.printer.user_input(
+            f"Choisissez un arc (1-{len(arcs)}) ou Entrée pour un nouvel arc : "
+        )
         try:
-            # Choisir une catégorie et obtenir le nom du fichier XML associé
-            xml_file_name = self.choose_category()
-            xml_file_path = os.path.join(self.xml_injector.export_dir, xml_file_name)
+            idx = int(choice) - 1
+            if idx < 0 or idx >= len(arcs):
+                raise ValueError
+            return arcs[idx]
+        except (ValueError, IndexError):
+            return None  # le service créera un nouvel arc auto-numéroté
 
-            # Choisir un fichier texte et en extraire les sections
-            text_file_path = self.file_chooser.choose_file_from_dir(self.entries_dir)
-            resume_text, main_text = self.data_extractor.extract_text_sections(text_file_path)
+    def choose_date(self, category):
+        default = self.service.suggest_entry_date(category)
+        hint = f" (Entrée = '{default}')" if default else ""
+        return self.printer.user_input(
+            f"Date de la session pour cette entrée{hint} : "
+        ).strip() or default
 
-            # Charger les données JSON complètes
-            full_context_data = self.json_injector.load_full_context_json()
+    def run_injection(self):
+        try:
+            category = self.choose_category()
+            raw_text, entry_file_to_archive = self.get_raw_text()
+            arc = self.choose_arc()
 
-            # Choisir un fichier de métadonnées et le charger
-            metadata_file_path = self.file_chooser.choose_file_from_dir(self.metadatas_dir)
-            metadata = self.json_injector.load_metadata_json(metadata_file_path)
+            metadata_file_path = self._choose_file(self.metadatas_dir)
+            metadata = self.service.json_injector.load_metadata_json(metadata_file_path)
 
-            # Injecter l'entrée dans le fichier JSON (en mémoire uniquement pour l'instant)
-            self.json_injector.inject_entry_in_json(resume_text, main_text, metadata, full_context_data)
+            entry_date = self.choose_date(category)
 
-            # Injecter le texte dans le fichier XML correspondant AVANT de sauvegarder le JSON.
-            # Si l'injection XML échoue, on ne sauvegarde pas le JSON : les deux fichiers
-            # restent ainsi synchronisés (pas d'entrée orpheline côté JSON).
-            try:
-                self.xml_injector.inject_text_in_xml(main_text, xml_file_name)
-            except Exception as e:
-                self.printer.error(f"Erreur lors de l'injection dans le XML : {e}")
-                self.printer.error("Le JSON n'a pas été sauvegardé afin de rester synchronisé avec le XML.")
+            request = InjectionRequest(
+                category=category,
+                raw_text=raw_text,
+                metadata=metadata,
+                arc=arc,
+                entry_date=entry_date,
+            )
+            result = self.service.run(request)
+
+            if not result.success:
+                self.printer.error("L'injection a échoué. Fichiers non archivés.")
                 return
 
-            # Les deux injections ont réussi : on persiste maintenant le JSON sur disque.
-            self.json_injector.save_full_context_json(full_context_data)
-
-            self.printer.success("Le processus d'injection a été terminé avec succès.")
-
-            self.printer.info("Génération du PDF.")
-
-            try:
-                pdf_output_path = os.getenv("PDF_OUTPUT_PATH", "output/Journal_Entries_By_Date.pdf")
-                pdf_generator = PDFGenerator(xml_file_path, pdf_output_path)
-                pdf_generator.run()
-            except Exception as e:
-                self.printer.error(f"Problème lors de la génération du PDF : {e}")
-
+            # Archivage APRÈS succès complet, comme avant.
+            self._archive_processed_files(entry_file_to_archive, metadata_file_path)
 
         except Exception as e:
             self.printer.error(f"Une erreur s'est produite : {e}")
 
+    # --- Sélection de fichier (menu console, spécifique CLI) ------------------
+
+    def _choose_file(self, dir_path):
+        files = FileChooser.list_files(dir_path)
+        self.printer.info(f"Fichiers disponibles dans '{dir_path}':")
+        for i, name in enumerate(files, start=1):
+            self.printer.custom_print(f"{i}. {name}", color=Fore.CYAN)
+        choice = self.printer.user_input(f"Choisissez un fichier (1-{len(files)}): ")
+        try:
+            idx = int(choice) - 1
+            if idx < 0 or idx >= len(files):
+                raise ValueError
+            return os.path.join(dir_path, files[idx])
+        except ValueError:
+            self.printer.error("Choix invalide.")
+            raise ValueError("Choix invalide.")
+
+    # --- Archivage fichiers (spécifique CLI) ---------------------------------
+
+    def _save_clipboard_copy(self, content):
+        archive_dir = os.path.join(self.entries_dir, ARCHIVE_SUBDIR)
+        os.makedirs(archive_dir, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        dest = os.path.join(archive_dir, f"presse-papiers_{timestamp}.txt")
+        with open(dest, 'w', encoding='utf-8') as f:
+            f.write(content)
+        self.printer.info(f"Texte du presse-papiers sauvegardé : {dest}")
+
+    def _archive_processed_files(self, entry_file_path, metadata_file_path):
+        if entry_file_path:
+            self._move_to_archive(entry_file_path, self.entries_dir)
+        self._move_to_archive(metadata_file_path, self.metadatas_dir)
+
+    def _move_to_archive(self, file_path, base_dir):
+        archive_dir = os.path.join(base_dir, ARCHIVE_SUBDIR)
+        os.makedirs(archive_dir, exist_ok=True)
+        dest = os.path.join(archive_dir, os.path.basename(file_path))
+        if os.path.exists(dest):
+            base, ext = os.path.splitext(os.path.basename(file_path))
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            dest = os.path.join(archive_dir, f"{base}_{timestamp}{ext}")
+        shutil.move(file_path, dest)
+        self.printer.info(f"Fichier archivé : {os.path.basename(file_path)} -> {archive_dir}")

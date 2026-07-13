@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Injecter — Abyssiaelle{% endblock %}
+{% block content %}
+<h1>Nouvelle injection</h1>
+
+{% if config_error %}
+<div class="alert error">
+    ⚠️ {{ config_error }}
+    <a class="btn small" href="/settings">Ouvrir les paramètres</a>
+</div>
+{% endif %}
+
+<div class="grid">
+    <form id="inject-form" class="card"
+          hx-post="/inject" hx-target="#result" hx-swap="innerHTML"
+          hx-disabled-elt="#submit-btn" {% if config_error %}hx-disabled-elt="#submit-btn"{% endif %}>
+
+        <label>Catégorie
+            <select name="category"
+                    hx-get="/suggest-date" hx-target="#date-field" hx-swap="outerHTML"
+                    hx-trigger="change">
+                {% for c in categories %}
+                <option value="{{ c }}">{{ c }}</option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <label>Texte enrichi
+            <textarea name="raw_text" rows="12" placeholder="Resume : bref résumé…&#10;&#10;Text : corps complet du journal enrichi…"></textarea>
+            <small>Colle ici le texte enrichi. Sections <code>Resume :</code> (optionnelle) et <code>Text :</code> (obligatoire).</small>
+        </label>
+
+        <div class="row">
+            <label>Arc existant
+                <select name="arc_select">
+                    <option value="">— nouvel arc (auto) —</option>
+                    {% for a in arcs %}
+                    <option value="{{ a }}">{{ a }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>…ou nom d'un nouvel arc
+                <input type="text" name="new_arc" placeholder="ex. arc_prologue">
+            </label>
+        </div>
+
+        {% include "_date_field.html" %}
+
+        <div class="row">
+            <label>Métadonnées (fichier)
+                <select name="metadata_file">
+                    <option value="">— aucune / JSON ci-dessous —</option>
+                    {% for f in metadata_files %}
+                    <option value="{{ f }}">{{ f }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+        </div>
+        <label>…ou métadonnées JSON collées
+            <textarea name="metadata_json" rows="3" placeholder='{"lieu": "Bordeciel", "emotion": "tension"}'></textarea>
+        </label>
+
+        <button id="submit-btn" type="submit" class="btn primary"
+                {% if config_error %}disabled{% endif %}>
+            Injecter
+            <span class="htmx-indicator spinner"></span>
+        </button>
+    </form>
+
+    <div class="card result-panel">
+        <h2>Résultat</h2>
+        <div id="result">
+            <p class="muted">Le journal d'exécution s'affichera ici après l'injection.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

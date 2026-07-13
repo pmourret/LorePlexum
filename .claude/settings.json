@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m pip install fastapi==0.115.6 \"uvicorn==0.34.0\" jinja2==3.1.4 python-multipart==0.0.20)",
+      "Bash(curl -sSL \"https://unpkg.com/htmx.org@1.9.12/dist/htmx.min.js\" -o webapp/static/htmx.min.js)",
+      "Bash(python -m pip install httpx)"
+    ]
+  }
+}

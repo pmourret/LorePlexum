@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Paramètres — Abyssiaelle{% endblock %}
+{% block content %}
+<h1>Paramètres</h1>
+
+{% if saved %}
+<div class="alert success">✅ Paramètres enregistrés.</div>
+{% endif %}
+
+{% if all_ok %}
+<div class="alert success">✅ Configuration valide — l'injection est prête.</div>
+{% else %}
+<div class="alert warning">⚠️ Configuration incomplète : corrigez les champs en rouge ci-dessous.</div>
+{% endif %}
+
+<form method="post" action="/settings" class="card">
+    {% for c in checks %}
+    <label class="setting {{ c.status }}">
+        <span class="setting-label">
+            {{ c.label }}
+            {% if c.required %}<span class="req">*</span>{% endif %}
+            <code>{{ c.key }}</code>
+        </span>
+        <input type="text" name="{{ c.key }}" value="{{ c.value }}"
+               placeholder="{{ 'chemin…' if c.kind else 'valeur…' }}">
+        <span class="status-badge {{ c.status }}">
+            {% if c.status == 'ok' %}✅ {{ c.message }}
+            {% elif c.status == 'error' %}❌ {{ c.message }}
+            {% else %}— {{ c.message }}{% endif %}
+        </span>
+    </label>
+    {% endfor %}
+    <button type="submit" class="btn primary">Enregistrer</button>
+</form>
+
+<p class="muted">Les valeurs sont écrites dans le fichier <code>.env</code> à la racine du projet.
+La validation vérifie que les fichiers et dossiers existent réellement.</p>
+{% endblock %}

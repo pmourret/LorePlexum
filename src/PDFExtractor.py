@@ -6,20 +6,21 @@ from collections import defaultdict
 import os
 import unicodedata
 
-from src.EnvLoader import EnvLoader
-from src.ShellPrinter import ShellPrinter
+from src.Reporter import Reporter
 
 
 class PDFGenerator:
-    def __init__(self, xml_file_path, output_dir):
-        envloader = EnvLoader()
-        self.printer = ShellPrinter()
+    def __init__(self, xml_file_path, output_dir, pdf_export_file=None, reporter=None):
+        self.reporter = reporter or Reporter()
         self.xml_file_path = xml_file_path
         self.output_dir = output_dir
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
+        # Le préfixe du nom de fichier est désormais un paramètre (avec repli sur
+        # l'env), au lieu d'instancier un EnvLoader qui revalidait tout le .env.
+        prefix = pdf_export_file or os.getenv("PDF_EXPORT_FILE") or "Journal"
         current_date = datetime.now().strftime("%Y-%m-%d")
-        self.output_pdf_path = os.path.join(self.output_dir, f"{envloader.pdf_export_file}_{current_date}.pdf")
+        self.output_pdf_path = os.path.join(self.output_dir, f"{prefix}_{current_date}.pdf")
 
     @staticmethod
     def normalize_text(text):
@@ -91,9 +92,15 @@ class PDFGenerator:
         })
 
     def run(self):
-        """Execute the process of extracting entries and generating the PDF."""
+        """Execute the process of extracting entries and generating the PDF.
+
+        Retourne le chemin du PDF généré (ou None en cas d'échec) afin que la couche
+        appelante puisse l'exposer (lien de téléchargement web, log CLI...).
+        """
         try:
             self.generate_pdf()
-            self.printer.success(f"PDF généré avec succés dans {self.output_pdf_path}")
+            self.reporter.success(f"PDF généré avec succès dans {self.output_pdf_path}")
+            return self.output_pdf_path
         except Exception as e:
-            self.printer.error(f"Problème de génération du PDF : {e}")
+            self.reporter.error(f"Problème de génération du PDF : {e}")
+            return None

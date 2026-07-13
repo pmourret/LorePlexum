@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Historique — Abyssiaelle{% endblock %}
+{% block content %}
+<h1>Historique des injections</h1>
+
+<form class="filters card" hx-get="/history" hx-target="#history-table"
+      hx-swap="innerHTML" hx-trigger="change, keyup delay:400ms from:input[name='search']">
+    <label>Catégorie
+        <select name="categorie">
+            <option value="">Toutes</option>
+            {% for c in categories %}
+            <option value="{{ c }}" {{ 'selected' if c == f_categorie }}>{{ c }}</option>
+            {% endfor %}
+        </select>
+    </label>
+    <label>Arc
+        <select name="arc">
+            <option value="">Tous</option>
+            {% for a in arcs %}
+            <option value="{{ a }}" {{ 'selected' if a == f_arc }}>{{ a }}</option>
+            {% endfor %}
+        </select>
+    </label>
+    <label class="grow">Recherche
+        <input type="text" name="search" value="{{ f_search }}" placeholder="texte ou résumé…">
+    </label>
+</form>
+
+<div id="history-table">
+    {% include "_history_table.html" %}
+</div>
+{% endblock %}

@@ -1,0 +1,45 @@
+{% set icons = {"success": "✅", "error": "❌", "info": "ℹ️", "warning": "⚠️"} %}
+
+{% if result.success %}
+<div class="alert success">
+    ✅ Injection réussie —
+    catégorie <strong>{{ result.category }}</strong>,
+    arc <strong>{{ result.arc }}</strong>,
+    entrée <strong>#{{ result.entry_number }}</strong>
+    {% if result.injection_id %}<span class="muted">(archive #{{ result.injection_id }})</span>{% endif %}
+</div>
+{% if result.pdf_path and result.injection_id %}
+<p><a class="btn small" href="/pdf/{{ result.injection_id }}">📄 Télécharger le PDF</a></p>
+{% endif %}
+{% elif result.duplicate %}
+<div class="alert warning">
+    ⚠️ <strong>Doublon détecté.</strong>
+    Ce texte a déjà été injecté le {{ result.duplicate.date_injection }}
+    (catégorie « {{ result.duplicate.categorie }} », arc « {{ result.duplicate.arc }} »,
+    entrée #{{ result.duplicate.entry_number }}).
+</div>
+<form hx-post="/inject" hx-target="#result" hx-swap="innerHTML">
+    <input type="hidden" name="category" value="{{ form.category }}">
+    <input type="hidden" name="raw_text" value="{{ form.raw_text }}">
+    <input type="hidden" name="arc_select" value="{{ form.arc_select }}">
+    <input type="hidden" name="new_arc" value="{{ form.new_arc }}">
+    <input type="hidden" name="metadata_file" value="{{ form.metadata_file }}">
+    <input type="hidden" name="metadata_json" value="{{ form.metadata_json }}">
+    <input type="hidden" name="entry_date" value="{{ form.entry_date }}">
+    <input type="hidden" name="allow_duplicate" value="1">
+    <button type="submit" class="btn danger">Injecter malgré tout</button>
+    <a class="btn small" href="/injection/{{ result.duplicate.id }}">Voir l'injection existante</a>
+</form>
+{% else %}
+<div class="alert error">❌ L'injection a échoué. Voir le journal ci-dessous.</div>
+{% endif %}
+
+<h3 class="logs-title">Journal d'exécution</h3>
+<ul class="logs">
+    {% for m in result.messages %}
+    <li class="log {{ m.level }}">
+        <span class="log-icon">{{ icons.get(m.level, "•") }}</span>
+        <span class="log-msg">{{ m.message }}</span>
+    </li>
+    {% endfor %}
+</ul>
