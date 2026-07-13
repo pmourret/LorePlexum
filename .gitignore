@@ -1,6 +1,21 @@
+# --- Données locales du projet ---
 /input/
 /output/
+
+# --- Environnements virtuels ---
 /venv/
 /.venv/
+
+# --- Secrets / configuration locale ---
+# Le gabarit .env.struct reste versionné ; seul le .env réel est ignoré.
 .env
+
+# --- IDE ---
 /.idea/
+
+# --- Artefacts Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/

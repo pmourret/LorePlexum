@@ -6,18 +6,20 @@ from collections import defaultdict
 import os
 import unicodedata
 
+from src.EnvLoader import EnvLoader
 from src.ShellPrinter import ShellPrinter
 
 
 class PDFGenerator:
     def __init__(self, xml_file_path, output_dir):
+        envloader = EnvLoader()
         self.printer = ShellPrinter()
         self.xml_file_path = xml_file_path
         self.output_dir = output_dir
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
         current_date = datetime.now().strftime("%Y-%m-%d")
-        self.output_pdf_path = os.path.join(self.output_dir, f"Journal_Entries_{current_date}.pdf")
+        self.output_pdf_path = os.path.join(self.output_dir, f"{envloader.pdf_export_file}_{current_date}.pdf")
 
     @staticmethod
     def normalize_text(text):
@@ -64,7 +66,7 @@ class PDFGenerator:
         </style>
         </head>
         <body>
-        <h1>Journal du Dovahkiin</h1>
+        <h1>Journal d'Abyssiaelle</h1>
         """
 
         # Ajout des entrées

@@ -55,9 +55,20 @@ class XMLInjector:
         else:
             current_entry_number = 0
 
-        # Récupération de la dernière date existante
+        # Récupération de la dernière date existante (proposée comme valeur par défaut)
         last_date_element = data_section.find(f'date{current_entry_number}')
-        last_date_text = last_date_element.text if last_date_element is not None else "DateAutomatique"
+        last_date_text = last_date_element.text if last_date_element is not None else ""
+
+        # Demander la date réelle de la session à l'utilisateur.
+        # La date du calendrier de jeu (ex. "Evening Star, 15th, 4E 201") n'est connue
+        # que du joueur : aucune étape amont ne la capture. On la saisit donc ici, en
+        # proposant la dernière date connue par défaut (Entrée = réutiliser cette date).
+        default_hint = f" (Entrée = '{last_date_text}')" if last_date_text else ""
+        entry_date = self.printer.user_input(
+            f"Date de la session pour cette entrée{default_hint} : "
+        ).strip() or last_date_text
+        if not entry_date:
+            entry_date = "DateAutomatique"
 
         # Injection des textes segmentés dans les entrées existantes ou nouvelles
         todo_found = False
@@ -75,7 +86,7 @@ class XMLInjector:
         while segments_processed < len(input_text_segments):
             current_entry_number += 1
             new_date = ET.SubElement(data_section, f'date{current_entry_number}')
-            new_date.text = last_date_text  # Utiliser la dernière date connue
+            new_date.text = entry_date  # Date réelle saisie par l'utilisateur
             new_entry = ET.SubElement(data_section, f'entry{current_entry_number}')
             new_entry.text = input_text_segments[segments_processed]
             self.printer.info(f"Nouvelle entrée XML ajoutée avec ID {current_entry_number}.")

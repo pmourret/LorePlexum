@@ -5,10 +5,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="845ac05c-db54-41de-bbe4-f7cbefb2f3b2" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.env.struct" beforeDir="false" afterPath="$PROJECT_DIR$/.env.struct" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/LorePlexum.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/LorePlexum.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Main.py" beforeDir="false" afterPath="$PROJECT_DIR$/Main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/EnvLoader.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/EnvLoader.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/PDFExtractor.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/PDFExtractor.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -130,7 +130,17 @@
       <updated>1730484243537</updated>
       <workItem from="1730484246511" duration="7598000" />
       <workItem from="1731681992236" duration="751000" />
-      <workItem from="1731683355534" duration="6360000" />
+      <workItem from="1731683355534" duration="6554000" />
+      <workItem from="1735942251850" duration="84000" />
+      <workItem from="1735942523846" duration="1200000" />
+      <workItem from="1736023376388" duration="1649000" />
+      <workItem from="1737236467800" duration="39000" />
+      <workItem from="1737965633780" duration="1466000" />
+      <workItem from="1738104470617" duration="627000" />
+      <workItem from="1738231489867" duration="626000" />
+      <workItem from="1738313120279" duration="845000" />
+      <workItem from="1738369708655" duration="159000" />
+      <workItem from="1758143314932" duration="928000" />
     </task>
     <servers />
   </component>
@@ -139,5 +149,6 @@
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/TNFCDataInjector_v2$Main.coverage" NAME="Main Coverage Results" MODIFIED="1730496125206" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/Main_py$Main.coverage" NAME="Main Coverage Results" MODIFIED="1758143661344" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>
 </project>

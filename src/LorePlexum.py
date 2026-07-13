@@ -78,18 +78,21 @@ class TNFCDataInjector:
             metadata_file_path = self.file_chooser.choose_file_from_dir(self.metadatas_dir)
             metadata = self.json_injector.load_metadata_json(metadata_file_path)
 
-            # Injecter l'entrée dans le fichier JSON
+            # Injecter l'entrée dans le fichier JSON (en mémoire uniquement pour l'instant)
             self.json_injector.inject_entry_in_json(resume_text, main_text, metadata, full_context_data)
 
-            # Sauvegarder les changements dans le JSON
-            self.json_injector.save_full_context_json(full_context_data)
-
-            # Injecter le texte dans le fichier XML correspondant
+            # Injecter le texte dans le fichier XML correspondant AVANT de sauvegarder le JSON.
+            # Si l'injection XML échoue, on ne sauvegarde pas le JSON : les deux fichiers
+            # restent ainsi synchronisés (pas d'entrée orpheline côté JSON).
             try:
                 self.xml_injector.inject_text_in_xml(main_text, xml_file_name)
-            except ValueError as e:
+            except Exception as e:
                 self.printer.error(f"Erreur lors de l'injection dans le XML : {e}")
+                self.printer.error("Le JSON n'a pas été sauvegardé afin de rester synchronisé avec le XML.")
                 return
+
+            # Les deux injections ont réussi : on persiste maintenant le JSON sur disque.
+            self.json_injector.save_full_context_json(full_context_data)
 
             self.printer.success("Le processus d'injection a été terminé avec succès.")
 
