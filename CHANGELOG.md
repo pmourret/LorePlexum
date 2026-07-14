@@ -18,7 +18,9 @@ Catégories utilisées : **Ajouté**, **Modifié**, **Corrigé**, **Supprimé**,
   `deploy/`) : l'application peut tourner sur un serveur Docker distinct (ex.
   « hiatus ») et écrire sur le partage SMB (ex. « auditus ») monté en CIFS dans le
   conteneur. `deploy/docker-compose.yml` monte le partage (volume CIFS) et une base
-  SQLite persistante (volume nommé) ; gabarits d'environnement séparés
+  SQLite persistante (volume nommé), et **expose l'app via Traefik** (réseau externe
+  `proxy`, labels de routage, `APP_HOST` paramétrable) sans publier de port ;
+  gabarits d'environnement séparés
   (`deploy/.env.example` pour les secrets SMB, `deploy/app.env.example` pour la
   config appli) ; `deploy/DEPLOYMENT.md` documente le build, l'exécution et la
   **jonction de répertoire** côté PC de jeu pour partager le XML TakeNotes sans

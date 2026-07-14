@@ -23,6 +23,8 @@ de jeu et avec l'app disponible en permanence.
 
 - L'app tourne dans le conteneur et lit/écrit tous ses fichiers sur **auditus**
   (monté en CIFS sur `/mnt/auditus`).
+- L'exposition HTTP passe par **Traefik** (réseau externe `proxy`) : aucun port
+  n'est publié directement sur l'hôte.
 - Le dossier XML **TakeNotes vit sur auditus**. Le PC de jeu y accède via une
   **jonction de répertoire** : le jeu croit lire son dossier local, mais lit/écrit
   en réalité sur auditus. L'app et le jeu partagent donc le même fichier, **sans
@@ -36,6 +38,8 @@ de jeu et avec l'app disponible en permanence.
 - Docker + Docker Compose v2.
 - Le module noyau **CIFS** (paquet `cifs-utils` sur l'hôte) pour que le volume CIFS
   se monte.
+- **Traefik** en service et le réseau Docker externe `proxy` déjà créé
+  (`docker network create proxy` s'il n'existe pas), partagé avec les autres apps.
 
 ## 2. Configuration
 
@@ -48,7 +52,8 @@ cp app.env.example app.env    # config appli (chemins Linux sous /mnt/auditus)
 
 Éditez les deux fichiers. Ni `deploy/.env` ni `deploy/app.env` ne sont versionnés.
 
-- `deploy/.env` → `SMB_HOST`, `SMB_SHARE`, `SMB_USER`, `SMB_PASSWORD`.
+- `deploy/.env` → `SMB_HOST`, `SMB_SHARE`, `SMB_USER`, `SMB_PASSWORD`, et
+  `APP_HOST` (nom d'hôte Traefik, ex. `tnfc.core.home.arpa`).
 - `deploy/app.env` → chemins de l'app. Le partage `SMB_SHARE` est monté à la racine
   de `/mnt/auditus`, donc `\\auditus\PERSONNEL_PIERRE\03_GAMES\…` devient
   `/mnt/auditus/03_GAMES/…`.
@@ -61,7 +66,11 @@ docker compose up -d --build
 docker compose logs -f        # vérifier le démarrage (validation des chemins .env)
 ```
 
-L'interface est ensuite sur `http://hiatus:8000/`.
+L'interface est ensuite accessible via Traefik sur `http://<APP_HOST>/`
+(ex. `http://tnfc.core.home.arpa/`), sans port à ouvrir sur l'hôte.
+
+> Besoin d'un accès direct pour déboguer (hors Traefik) ? Ajoutez temporairement
+> `ports: ["8000:8000"]` au service dans `docker-compose.yml`.
 
 ## 4. Mise à jour
 

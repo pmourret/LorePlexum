@@ -1,17 +1,20 @@
-# Déploiement de TNFCDataInjector sur le serveur Docker « hiatus ».
+# Déploiement de TNFCDataInjector sur le serveur Docker « hiatus » (derrière Traefik).
 #
 # - L'app tourne dans le conteneur et écrit sur le partage SMB « auditus », monté
 #   en CIFS dans le volume `auditus` (-> /mnt/auditus dans le conteneur).
 # - La base d'archivage SQLite vit dans un volume Docker nommé (persistant).
+# - L'exposition HTTP est assurée par Traefik via le réseau externe `proxy` :
+#   pas de port publié directement sur l'hôte.
 #
 # Deux fichiers d'environnement (voir les .example à côté) :
 #   - .env      : lu automatiquement par Docker Compose pour l'interpolation
-#                 ${...} ci-dessous (identifiants SMB, hôte, partage). NE PAS
-#                 versionner (secrets).
+#                 ${...} ci-dessous (identifiants SMB, hôte, partage, APP_HOST).
+#                 NE PAS versionner (secrets).
 #   - app.env   : configuration de l'APPLICATION (chemins Linux vers /mnt/auditus),
 #                 injectée dans le conteneur via env_file.
 #
-# Prérequis sur l'hôte hiatus : module noyau CIFS disponible (paquet cifs-utils).
+# Prérequis sur l'hôte hiatus : module noyau CIFS (paquet cifs-utils) et le
+# réseau Docker externe `proxy` déjà créé (partagé avec Traefik).
 
 services:
   tnfc:
@@ -21,13 +24,24 @@ services:
     image: tnfc-injector:latest
     container_name: tnfc-injector
     restart: unless-stopped
-    ports:
-      - "8000:8000"
     env_file:
       - app.env
     volumes:
       - auditus:/mnt/auditus
       - tnfc-data:/data
+    networks:
+      - proxy
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.tnfc.rule=Host(`${APP_HOST}`)
+      - traefik.http.routers.tnfc.entrypoints=web
+      - traefik.http.services.tnfc.loadbalancer.server.port=8000
+
+networks:
+  # Réseau partagé avec Traefik, créé hors de ce compose.
+  proxy:
+    external: true
 
 volumes:
   # Partage SMB auditus monté directement par Docker (driver local + CIFS).
