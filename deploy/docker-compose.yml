@@ -21,22 +21,22 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
-    image: tnfc-injector:latest
-    container_name: tnfc-injector
+    image: loreplexum-injector:latest
+    container_name: loreplexum-injector
     restart: unless-stopped
     env_file:
       - app.env
     volumes:
-      - auditus:/mnt/auditus
+      - auditus:/mnt/TakeNotes
       - tnfc-data:/data
     networks:
       - proxy
     labels:
       - traefik.enable=true
       - traefik.docker.network=proxy
-      - traefik.http.routers.tnfc.rule=Host(`${APP_HOST}`)
-      - traefik.http.routers.tnfc.entrypoints=web
-      - traefik.http.services.tnfc.loadbalancer.server.port=8000
+      - traefik.http.routers.loreplexum.rule=Host(`${APP_HOST}`)
+      - traefik.http.routers.loreplexum.entrypoints=web
+      - traefik.http.services.loreplexum.loadbalancer.server.port=8000
 
 networks:
   # Réseau partagé avec Traefik, créé hors de ce compose.
