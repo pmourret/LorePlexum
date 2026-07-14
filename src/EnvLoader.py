@@ -23,10 +23,12 @@ class EnvLoader:
         pipeline planter plus loin avec une erreur vague.
         """
         # 1. Variables obligatoires renseignées (non vides).
+        # METADATAS_DIR est désormais FACULTATIF : les métadonnées étaient un vestige
+        # du workflow ChatGPT (V1) et ne sont plus nécessaires. On ne bloque donc plus
+        # le démarrage si le dossier n'est pas configuré.
         required = {
             'FULL_CONTEXT_JSON_PATH': self.full_context_json_path,
             'ENTRIES_DIR': self.entries_dir,
-            'METADATAS_DIR': self.metadatas_dir,
             'TAKE_NOTES_EXPORT_DIR': self.take_notes_export_dir,
         }
         missing_vars = [name for name, value in required.items() if not value]
@@ -40,9 +42,13 @@ class EnvLoader:
         path_checks = [
             ('FULL_CONTEXT_JSON_PATH', self.full_context_json_path, 'fichier'),
             ('ENTRIES_DIR', self.entries_dir, 'dossier'),
-            ('METADATAS_DIR', self.metadatas_dir, 'dossier'),
             ('TAKE_NOTES_EXPORT_DIR', self.take_notes_export_dir, 'dossier'),
         ]
+        # METADATAS_DIR n'est vérifié que s'il est renseigné (facultatif, mais si on
+        # le fournit il doit pointer sur un dossier réel).
+        if self.metadatas_dir:
+            path_checks.append(('METADATAS_DIR', self.metadatas_dir, 'dossier'))
+
         problems = []
         for name, path, kind in path_checks:
             exists = os.path.isfile(path) if kind == 'fichier' else os.path.isdir(path)

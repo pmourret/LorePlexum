@@ -46,19 +46,23 @@
 
         {% include "_date_field.html" %}
 
-        <div class="row">
-            <label>Métadonnées (fichier)
-                <select name="metadata_file">
-                    <option value="">— aucune / JSON ci-dessous —</option>
-                    {% for f in metadata_files %}
-                    <option value="{{ f }}">{{ f }}</option>
-                    {% endfor %}
-                </select>
+        <details class="optional-block">
+            <summary>Métadonnées (facultatif — hérité de la V1)</summary>
+            <small class="muted">Vestige du workflow ChatGPT. Optionnel : laisser vide pour ne rien joindre.</small>
+            <div class="row">
+                <label>Métadonnées (fichier)
+                    <select name="metadata_file">
+                        <option value="">— aucune / JSON ci-dessous —</option>
+                        {% for f in metadata_files %}
+                        <option value="{{ f }}">{{ f }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+            </div>
+            <label>…ou métadonnées JSON collées
+                <textarea name="metadata_json" rows="3" placeholder='{"lieu": "Bordeciel", "emotion": "tension"}'></textarea>
             </label>
-        </div>
-        <label>…ou métadonnées JSON collées
-            <textarea name="metadata_json" rows="3" placeholder='{"lieu": "Bordeciel", "emotion": "tension"}'></textarea>
-        </label>
+        </details>
 
         <button id="submit-btn" type="submit" class="btn primary"
                 {% if config_error %}disabled{% endif %}>

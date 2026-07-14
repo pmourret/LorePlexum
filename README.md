@@ -130,7 +130,7 @@ des chemins. Un gabarit est fourni dans `.env.struct`.
 |---|:---:|---|
 | `FULL_CONTEXT_JSON_PATH` | ✅ | Chemin du JSON de contexte complet (`full_context.json`). |
 | `ENTRIES_DIR` | ✅ | Dossier contenant les fichiers texte enrichis. |
-| `METADATAS_DIR` | ✅ | Dossier contenant les fichiers JSON de métadonnées. |
+| `METADATAS_DIR` | — | Dossier des fichiers JSON de métadonnées. **Facultatif** (vestige V1/ChatGPT) : l'app démarre sans. |
 | `TAKE_NOTES_EXPORT_DIR` | ✅ | Dossier des exports XML TakeNotes (`ExportChapterN.xml`). |
 | `PDF_OUTPUT_PATH` | — | Dossier de sortie du PDF (défaut : `output/`). |
 | `PDF_EXPORT_FILE` | — | Préfixe du nom de fichier PDF (le suffixe `_AAAA-MM-JJ.pdf` est ajouté). |
@@ -176,8 +176,8 @@ le terminal) :
    optionnelle et `Text :` obligatoire).
 3. **Arc** narratif : sélection d'un arc existant, ou saisie d'un nom pour créer un
    nouvel arc (laisser vide = nouvel arc auto-numéroté).
-4. **Métadonnées** : choix d'un fichier du dossier `METADATAS_DIR`, **ou** JSON
-   collé directement.
+4. **Métadonnées** *(facultatif, hérité de la V1/ChatGPT)* : bloc dépliable ;
+   choix d'un fichier de `METADATAS_DIR` **ou** JSON collé. Peut rester vide.
 5. **Date de la session** (calendrier du jeu, ex. `Evening Star, 15th, 4E 201`),
    pré-remplie avec la dernière date connue de la catégorie.
 
@@ -232,7 +232,13 @@ Resume : Bref résumé de l'entrée, une ou deux phrases.
 Text : Corps complet du journal, enrichi narrativement.
 ```
 
-### Fichier de métadonnées (`METADATAS_DIR`)
+### Fichier de métadonnées (`METADATAS_DIR`) — *facultatif, hérité*
+
+> **Note.** Les métadonnées servaient à donner du contexte à ChatGPT (V1) pour
+> garder la cohérence. Avec le workflow actuel elles ne sont plus nécessaires :
+> elles restent uniquement **stockées** (champ `metadata` du JSON, colonne
+> `metadata_json` de la base) et ne sont réinjectées nulle part. Le champ est
+> désormais **optionnel** partout et le CLI ne le demande plus.
 
 Un JSON libre décrivant le contexte de la scène (personnage, environnement,
 émotions, détails sensoriels, conséquences…). Il est stocké tel quel dans le champ

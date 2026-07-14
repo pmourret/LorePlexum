@@ -2,8 +2,9 @@
 
 Le cœur métier est désormais découplé du terminal (voir InjectionService). Cette
 classe ne fait plus QUE de l'interaction console : elle collecte les choix de
-l'utilisateur (catégorie, source du texte, arc, métadonnées, date), puis délègue
-l'exécution au service, exactement comme le fera l'interface web.
+l'utilisateur (catégorie, source du texte, arc, date), puis délègue l'exécution au
+service, exactement comme le fait l'interface web. Les métadonnées (vestige V1) ne
+sont plus demandées.
 
 Les préoccupations purement "fichiers + terminal" (copie du presse-papiers,
 archivage des fichiers traités) restent ici, car elles n'ont pas de sens côté web.
@@ -35,7 +36,6 @@ class TNFCDataInjector:
         env = EnvLoader()
         self.paths = env.get_paths()
         self.entries_dir = self.paths['entries_dir']
-        self.metadatas_dir = self.paths['metadatas_dir']
 
         # Reporter avec écho console : les logs du service s'affichent en direct.
         self.reporter = Reporter(echo=True)
@@ -117,16 +117,13 @@ class TNFCDataInjector:
             category = self.choose_category()
             raw_text, entry_file_to_archive = self.get_raw_text()
             arc = self.choose_arc()
-
-            metadata_file_path = self._choose_file(self.metadatas_dir)
-            metadata = self.service.json_injector.load_metadata_json(metadata_file_path)
-
             entry_date = self.choose_date(category)
 
+            # Métadonnées abandonnées (vestige V1/ChatGPT) : on n'en demande plus.
+            # Le service utilise {} par défaut.
             request = InjectionRequest(
                 category=category,
                 raw_text=raw_text,
-                metadata=metadata,
                 arc=arc,
                 entry_date=entry_date,
             )
@@ -137,7 +134,7 @@ class TNFCDataInjector:
                 return
 
             # Archivage APRÈS succès complet, comme avant.
-            self._archive_processed_files(entry_file_to_archive, metadata_file_path)
+            self._archive_processed_files(entry_file_to_archive)
 
         except Exception as e:
             self.printer.error(f"Une erreur s'est produite : {e}")
@@ -170,10 +167,10 @@ class TNFCDataInjector:
             f.write(content)
         self.printer.info(f"Texte du presse-papiers sauvegardé : {dest}")
 
-    def _archive_processed_files(self, entry_file_path, metadata_file_path):
+    def _archive_processed_files(self, entry_file_path):
+        # Seul le fichier d'entrée est archivé : les métadonnées ne sont plus utilisées.
         if entry_file_path:
             self._move_to_archive(entry_file_path, self.entries_dir)
-        self._move_to_archive(metadata_file_path, self.metadatas_dir)
 
     def _move_to_archive(self, file_path, base_dir):
         archive_dir = os.path.join(base_dir, ARCHIVE_SUBDIR)

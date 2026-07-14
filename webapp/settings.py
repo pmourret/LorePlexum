@@ -17,7 +17,7 @@ ENV_PATH = os.path.join(PROJECT_ROOT, ".env")
 FIELDS = [
     ("FULL_CONTEXT_JSON_PATH", "JSON de contexte complet", "file", True),
     ("ENTRIES_DIR", "Dossier des textes enrichis", "dir", True),
-    ("METADATAS_DIR", "Dossier des métadonnées", "dir", True),
+    ("METADATAS_DIR", "Dossier des métadonnées (facultatif, hérité V1)", "dir", False),
     ("TAKE_NOTES_EXPORT_DIR", "Dossier des exports XML TakeNotes", "dir", True),
     ("PDF_OUTPUT_PATH", "Dossier de sortie des PDF", "dir", False),
     ("PDF_EXPORT_FILE", "Préfixe du nom de fichier PDF", None, False),
