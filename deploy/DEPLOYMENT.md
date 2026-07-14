@@ -7,25 +7,26 @@ de jeu et avec l'app disponible en permanence.
 ## Vue d'ensemble
 
 ```
-┌────────────────────┐        SMB/CIFS         ┌────────────────────────┐
-│  hiatus (Docker)   │  ───── /mnt/auditus ──► │  auditus (stockage SMB)│
-│  conteneur FastAPI │                         │  full_context.json     │
-│  + WeasyPrint      │                         │  entries/ · metadatas/ │
-│  :8000             │                         │  export_pdf/           │
-└────────────────────┘                         │  TakeNotes/  (XML) ◄─┐ │
-                                               └──────────────────────┼─┘
-                                                                      │ jonction
-                                               ┌──────────────────────┴─┐
-                                               │  PC de jeu (Skyrim)     │
-                                               │  …/TakeNotes  --> auditus│
-                                               └─────────────────────────┘
+┌────────────────────┐       SMB/CIFS        ┌──────────────────────────────┐
+│  hiatus (Docker)   │ ──── /mnt/TakeNotes ─►│  auditus — …/TakeNotes/       │
+│  conteneur FastAPI │                       │  ExportChapter1..5.xml  ◄──┐  │
+│  + WeasyPrint      │                       │  _APP/ENTRIES              │  │
+│  :8000 (Traefik)   │                       │  _APP/FULL_CONTEXT_JSON    │  │
+└────────────────────┘                       │  _APP/METADATAS · PDF_OUTPUT│ │
+                                             └────────────────────────────┼──┘
+                                                                          │ jonction
+                                             ┌────────────────────────────┴──┐
+                                             │  PC de jeu (Skyrim)            │
+                                             │  …/FISS/TakeNotes --> auditus  │
+                                             └────────────────────────────────┘
 ```
 
-- L'app tourne dans le conteneur et lit/écrit tous ses fichiers sur **auditus**
-  (monté en CIFS sur `/mnt/auditus`).
+- L'app tourne dans le conteneur et lit/écrit tous ses fichiers sur **auditus**.
+  On monte directement le dossier **TakeNotes** sur `/mnt/TakeNotes` : il contient
+  les `ExportChapterN.xml` du jeu **et** le sous-dossier `_APP` (données de l'appli).
 - L'exposition HTTP passe par **Traefik** (réseau externe `proxy`) : aucun port
   n'est publié directement sur l'hôte.
-- Le dossier XML **TakeNotes vit sur auditus**. Le PC de jeu y accède via une
+- Le dossier **TakeNotes vit sur auditus**. Le PC de jeu y accède via une
   **jonction de répertoire** : le jeu croit lire son dossier local, mais lit/écrit
   en réalité sur auditus. L'app et le jeu partagent donc le même fichier, **sans
   aucune copie manuelle**.
@@ -46,17 +47,17 @@ de jeu et avec l'app disponible en permanence.
 Depuis `deploy/` :
 
 ```bash
-cp .env.example .env          # secrets SMB (hôte, partage, identifiants)
-cp app.env.example app.env    # config appli (chemins Linux sous /mnt/auditus)
+cp .env.example .env          # infra : hôte SMB, chemin monté, credentials, APP_HOST
+cp app.env.example app.env    # config appli (chemins Linux sous /mnt/TakeNotes)
 ```
 
 Éditez les deux fichiers. Ni `deploy/.env` ni `deploy/app.env` ne sont versionnés.
 
-- `deploy/.env` → `SMB_HOST`, `SMB_SHARE`, `SMB_USER`, `SMB_PASSWORD`, et
-  `APP_HOST` (nom d'hôte Traefik, ex. `tnfc.core.home.arpa`).
-- `deploy/app.env` → chemins de l'app. Le partage `SMB_SHARE` est monté à la racine
-  de `/mnt/auditus`, donc `\\auditus\PERSONNEL_PIERRE\03_GAMES\…` devient
-  `/mnt/auditus/03_GAMES/…`.
+- `deploy/.env` → `SMB_HOST`, `SMB_PATH` (chemin complet monté = dossier TakeNotes,
+  identique au device du `/etc/fstab`), `SMB_CREDENTIALS` (fichier de credentials
+  CIFS sur l'hôte, le même que le `/etc/fstab`), et `APP_HOST` (hôte Traefik).
+- `deploy/app.env` → chemins de l'app. Le dossier TakeNotes est monté sur
+  `/mnt/TakeNotes` ; les données de l'appli sont sous `/mnt/TakeNotes/_APP/…`.
 
 ## 3. Build & run
 
@@ -91,13 +92,14 @@ Objectif : que le dossier TakeNotes du jeu pointe vers auditus, pour que
 l'injection faite par hiatus soit vue par le jeu sans copie.
 
 1. **Déplacez** une première fois le contenu actuel de
-   `…\Nolvus…\overwrite\SKSE\Plugins\FISS\TakeNotes` vers l'emplacement retenu sur
-   auditus (celui de `TAKE_NOTES_EXPORT_DIR`).
+   `…\Nolvus…\overwrite\SKSE\Plugins\FISS\TakeNotes` vers auditus, dans
+   `…\03_TESV_ABYSSIAELLE\TakeNotes` (le dossier monté). Conservez le sous-dossier
+   `_APP` à côté des `ExportChapterN.xml`.
 2. Ouvrez une invite **en administrateur** et créez le lien vers le chemin UNC :
 
    ```bat
    rmdir "G:\Nolvus_v5\Instances\Nolvus Ascension\MODS\overwrite\SKSE\Plugins\FISS\TakeNotes"
-   mklink /D "G:\Nolvus_v5\Instances\Nolvus Ascension\MODS\overwrite\SKSE\Plugins\FISS\TakeNotes" "\\auditus.safe.home.arpa\PERSONNEL_PIERRE\03_GAMES\01_SKYRIM_NOLVUS\01_TAKENOTES\TakeNotes"
+   mklink /D "G:\Nolvus_v5\Instances\Nolvus Ascension\MODS\overwrite\SKSE\Plugins\FISS\TakeNotes" "\\auditus.lan\PERSONNEL_PIERRE\03_GAMES\01_SKYRIM_NOLVUS\03_TESV_ABYSSIAELLE\TakeNotes"
    ```
 
    > `mklink /D` crée un lien symbolique de répertoire, qui **supporte les cibles
