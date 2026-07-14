@@ -1,20 +1,22 @@
 # Déploiement de TNFCDataInjector sur le serveur Docker « hiatus » (derrière Traefik).
 #
-# - L'app tourne dans le conteneur et écrit sur le partage SMB « auditus » : on
-#   monte le dossier TakeNotes en CIFS dans le volume `auditus` (-> /mnt/TakeNotes).
+# - Le dossier TakeNotes du partage « auditus » est monté sur l'HÔTE via /etc/fstab
+#   (mount.cifs + fichier de credentials, déjà éprouvé) à /mnt/TakeNotes. Le
+#   conteneur le BIND-MONTE : Docker ne gère pas le CIFS lui-même.
+#   -> évite l'écueil « credentials= inconnu du syscall mount » du driver local.
 # - La base d'archivage SQLite vit dans un volume Docker nommé (persistant).
 # - L'exposition HTTP est assurée par Traefik via le réseau externe `proxy` :
 #   pas de port publié directement sur l'hôte.
 #
-# Deux fichiers d'environnement (voir les .example à côté) :
-#   - .env      : lu automatiquement par Docker Compose pour l'interpolation
-#                 ${...} ci-dessous (SMB_HOST, SMB_PATH, SMB_CREDENTIALS, APP_HOST).
-#                 NE PAS versionner (secrets).
+# Un seul fichier d'environnement (voir les .example à côté) :
+#   - .env      : lu par Docker Compose pour l'interpolation ${APP_HOST} du label
+#                 Traefik. NE PAS versionner.
 #   - app.env   : configuration de l'APPLICATION (chemins Linux sous /mnt/TakeNotes),
 #                 injectée dans le conteneur via env_file.
 #
-# Prérequis sur l'hôte hiatus : module noyau CIFS (paquet cifs-utils) et le
-# réseau Docker externe `proxy` déjà créé (partagé avec Traefik).
+# Prérequis sur l'hôte hiatus :
+#   - le dossier TakeNotes monté à /mnt/TakeNotes via /etc/fstab (voir DEPLOYMENT.md) ;
+#   - le réseau Docker externe `proxy` (partagé avec Traefik).
 
 services:
   tnfc:
@@ -27,7 +29,9 @@ services:
     env_file:
       - app.env
     volumes:
-      - auditus:/mnt/TakeNotes
+      # Bind-mount du montage CIFS géré par l'hôte (fstab). Doit être monté AVANT
+      # le démarrage du conteneur (les entrées fstab `_netdev` le sont au boot).
+      - /mnt/TakeNotes:/mnt/TakeNotes
       - tnfc-data:/data
     networks:
       - proxy
@@ -44,17 +48,6 @@ networks:
     external: true
 
 volumes:
-  # Partage SMB auditus monté directement par Docker (driver local + CIFS).
-  # On réutilise le MÊME fichier de credentials que le fstab de l'hôte (éprouvé)
-  # plutôt que des identifiants inline : le daemon Docker (root) le lit au montage.
-  # Pas de `vers=` forcé -> négociation auto, comme le fstab.
-  auditus:
-    driver: local
-    driver_opts:
-      type: cifs
-      o: "credentials=${SMB_CREDENTIALS},uid=1000,gid=1000,file_mode=0664,dir_mode=0775,iocharset=utf8"
-      device: "//${SMB_HOST}/${SMB_PATH}"
-
   # Base SQLite (historique + anti-doublon) : persistée hors de l'image.
   tnfc-data:
     driver: local

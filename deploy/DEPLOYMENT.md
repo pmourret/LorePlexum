@@ -7,23 +7,24 @@ de jeu et avec l'app disponible en permanence.
 ## Vue d'ensemble
 
 ```
-┌────────────────────┐       SMB/CIFS        ┌──────────────────────────────┐
-│  hiatus (Docker)   │ ──── /mnt/TakeNotes ─►│  auditus — …/TakeNotes/       │
-│  conteneur FastAPI │                       │  ExportChapter1..5.xml  ◄──┐  │
-│  + WeasyPrint      │                       │  _APP/ENTRIES              │  │
-│  :8000 (Traefik)   │                       │  _APP/FULL_CONTEXT_JSON    │  │
-└────────────────────┘                       │  _APP/METADATAS · PDF_OUTPUT│ │
-                                             └────────────────────────────┼──┘
-                                                                          │ jonction
-                                             ┌────────────────────────────┴──┐
-                                             │  PC de jeu (Skyrim)            │
-                                             │  …/FISS/TakeNotes --> auditus  │
-                                             └────────────────────────────────┘
+┌────────────────────┐   fstab CIFS (hôte)   ┌──────────────────────────────┐
+│  hiatus            │  //auditus/…/TakeNotes │  auditus — …/TakeNotes/       │
+│  /mnt/TakeNotes ───┼──────────────────────► │  _OUTPUT/ExportChapter1..5.xml ◄┐
+│    │ bind-mount    │                        │  _APP/ENTRIES                 │ │
+│    ▼               │                        │  _APP/FULL_CONTEXT_JSON       │ │
+│  conteneur FastAPI │                        │  _APP/METADATAS · PDF_OUTPUT  │ │
+│  + WeasyPrint      │                        └───────────────────────────────┼┘
+│  :8000 (Traefik)   │                                                        │ jonction
+└────────────────────┘                        ┌───────────────────────────────┴┐
+                                              │  PC de jeu (Skyrim)             │
+                                              │  …/FISS/TakeNotes --> auditus   │
+                                              └─────────────────────────────────┘
 ```
 
-- L'app tourne dans le conteneur et lit/écrit tous ses fichiers sur **auditus**.
-  On monte directement le dossier **TakeNotes** sur `/mnt/TakeNotes` : il contient
-  les `ExportChapterN.xml` du jeu **et** le sous-dossier `_APP` (données de l'appli).
+- **L'hôte** monte le dossier TakeNotes d'auditus à `/mnt/TakeNotes` via
+  `/etc/fstab` (mount.cifs + fichier de credentials). Le **conteneur bind-monte**
+  ce dossier : Docker ne gère pas le CIFS lui-même (le driver de volume `local`
+  utilise le syscall `mount`, qui ne connaît pas l'option `credentials=`).
 - L'exposition HTTP passe par **Traefik** (réseau externe `proxy`) : aucun port
   n'est publié directement sur l'hôte.
 - Le dossier **TakeNotes vit sur auditus**. Le PC de jeu y accède via une
@@ -37,8 +38,15 @@ de jeu et avec l'app disponible en permanence.
 ## 1. Prérequis sur hiatus
 
 - Docker + Docker Compose v2.
-- Le module noyau **CIFS** (paquet `cifs-utils` sur l'hôte) pour que le volume CIFS
-  se monte.
+- **Le dossier TakeNotes monté sur l'hôte à `/mnt/TakeNotes`** via `/etc/fstab`
+  (paquet `cifs-utils` requis). Entrée fstab (avec fichier de credentials) :
+
+  ```fstab
+  //192.168.1.138/PERSONNEL_PIERRE/03_GAMES/01_SKYRIM_NOLVUS/03_TESV_ABYSSIAELLE/TakeNotes /mnt/TakeNotes cifs credentials=/home/pmourret_adm/.smbcredentials,uid=1000,gid=1000,_netdev 0 0
+  ```
+
+  Montez-le avant le premier run : `sudo mount /mnt/TakeNotes` (au boot, `_netdev`
+  s'en charge). Vérifiez : `ls /mnt/TakeNotes` doit lister `_APP/`, `_OUTPUT/`…
 - **Traefik** en service et le réseau Docker externe `proxy` déjà créé
   (`docker network create proxy` s'il n'existe pas), partagé avec les autres apps.
 
@@ -47,17 +55,16 @@ de jeu et avec l'app disponible en permanence.
 Depuis `deploy/` :
 
 ```bash
-cp .env.example .env          # infra : hôte SMB, chemin monté, credentials, APP_HOST
+cp .env.example .env          # une seule variable : APP_HOST (hôte Traefik)
 cp app.env.example app.env    # config appli (chemins Linux sous /mnt/TakeNotes)
 ```
 
 Éditez les deux fichiers. Ni `deploy/.env` ni `deploy/app.env` ne sont versionnés.
 
-- `deploy/.env` → `SMB_HOST`, `SMB_PATH` (chemin complet monté = dossier TakeNotes,
-  identique au device du `/etc/fstab`), `SMB_CREDENTIALS` (fichier de credentials
-  CIFS sur l'hôte, le même que le `/etc/fstab`), et `APP_HOST` (hôte Traefik).
-- `deploy/app.env` → chemins de l'app. Le dossier TakeNotes est monté sur
-  `/mnt/TakeNotes` ; les données de l'appli sont sous `/mnt/TakeNotes/_APP/…`.
+- `deploy/.env` → `APP_HOST` uniquement (le montage CIFS est géré par l'hôte, pas
+  par Docker, donc plus d'identifiants SMB ici).
+- `deploy/app.env` → chemins de l'app : XML dans `/mnt/TakeNotes/_OUTPUT`, données
+  de l'appli sous `/mnt/TakeNotes/_APP/…`.
 
 ## 3. Build & run
 
@@ -91,15 +98,19 @@ reconstructions.
 Objectif : que le dossier TakeNotes du jeu pointe vers auditus, pour que
 l'injection faite par hiatus soit vue par le jeu sans copie.
 
+Le dossier monté `…\03_TESV_ABYSSIAELLE\TakeNotes` contient deux sous-dossiers :
+`_OUTPUT` (les `ExportChapterN.xml`, cible de l'export du jeu) et `_APP` (données
+de l'appli). La jonction doit donc pointer vers **`_OUTPUT`**, pour que le jeu
+écrive ses XML là où l'app les lit (`TAKE_NOTES_EXPORT_DIR=/mnt/TakeNotes/_OUTPUT`).
+
 1. **Déplacez** une première fois le contenu actuel de
-   `…\Nolvus…\overwrite\SKSE\Plugins\FISS\TakeNotes` vers auditus, dans
-   `…\03_TESV_ABYSSIAELLE\TakeNotes` (le dossier monté). Conservez le sous-dossier
-   `_APP` à côté des `ExportChapterN.xml`.
+   `…\Nolvus…\overwrite\SKSE\Plugins\FISS\TakeNotes` (les `ExportChapterN.xml`) vers
+   auditus, dans `…\03_TESV_ABYSSIAELLE\TakeNotes\_OUTPUT`.
 2. Ouvrez une invite **en administrateur** et créez le lien vers le chemin UNC :
 
    ```bat
    rmdir "G:\Nolvus_v5\Instances\Nolvus Ascension\MODS\overwrite\SKSE\Plugins\FISS\TakeNotes"
-   mklink /D "G:\Nolvus_v5\Instances\Nolvus Ascension\MODS\overwrite\SKSE\Plugins\FISS\TakeNotes" "\\auditus.lan\PERSONNEL_PIERRE\03_GAMES\01_SKYRIM_NOLVUS\03_TESV_ABYSSIAELLE\TakeNotes"
+   mklink /D "G:\Nolvus_v5\Instances\Nolvus Ascension\MODS\overwrite\SKSE\Plugins\FISS\TakeNotes" "\\auditus.lan\PERSONNEL_PIERRE\03_GAMES\01_SKYRIM_NOLVUS\03_TESV_ABYSSIAELLE\TakeNotes\_OUTPUT"
    ```
 
    > `mklink /D` crée un lien symbolique de répertoire, qui **supporte les cibles
