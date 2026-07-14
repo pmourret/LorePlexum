@@ -13,7 +13,28 @@ Catégories utilisées : **Ajouté**, **Modifié**, **Corrigé**, **Supprimé**,
 
 ## [Non publié]
 
-_Rien pour l'instant._
+### Ajouté
+- **Conteneurisation & déploiement Docker** (`Dockerfile`, `.dockerignore`,
+  `deploy/`) : l'application peut tourner sur un serveur Docker distinct (ex.
+  « hiatus ») et écrire sur le partage SMB (ex. « auditus ») monté en CIFS dans le
+  conteneur. `deploy/docker-compose.yml` monte le partage (volume CIFS) et une base
+  SQLite persistante (volume nommé) ; gabarits d'environnement séparés
+  (`deploy/.env.example` pour les secrets SMB, `deploy/app.env.example` pour la
+  config appli) ; `deploy/DEPLOYMENT.md` documente le build, l'exécution et la
+  **jonction de répertoire** côté PC de jeu pour partager le XML TakeNotes sans
+  copie manuelle.
+
+### Modifié
+- **Génération PDF migrée de `pdfkit`/wkhtmltopdf vers WeasyPrint** : plus aucun
+  binaire externe à installer (WeasyPrint est pur Python, s'appuyant sur des libs
+  système Pango/Cairo fournies par l'image Docker). L'import de WeasyPrint est
+  **différé** dans `generate_pdf()` pour qu'un poste sans ces libs (dev Windows)
+  démarre quand même — seule la génération PDF est alors indisponible, de façon non
+  bloquante. Numérotation des pages désormais gérée par les CSS Paged Media
+  (`@page` + `counter`) au lieu du pied de page JavaScript de wkhtmltopdf.
+
+### Supprimé
+- Dépendance `pdfkit` et le prérequis binaire externe **wkhtmltopdf**.
 
 ---
 

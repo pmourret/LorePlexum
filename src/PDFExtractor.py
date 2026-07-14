@@ -1,6 +1,5 @@
 from datetime import datetime
 
-import pdfkit
 from xml.etree import ElementTree as ET
 from collections import defaultdict
 import os
@@ -46,9 +45,20 @@ class PDFGenerator:
             raise ValueError(f"Erreur lors de l'extraction des données XML : {e}")
 
     def generate_pdf(self):
+        """Génère le PDF à partir du HTML via WeasyPrint (pur Python + libs système).
+
+        WeasyPrint remplace pdfkit/wkhtmltopdf : plus aucun binaire externe à
+        installer. La numérotation des pages passe par les CSS Paged Media
+        (`@page` + `counter(page)`), en lieu et place du pied de page JavaScript
+        que renseignait wkhtmltopdf.
         """
-        Generate a PDF using PDFKit from enhanced HTML content.
-        """
+        # Import tardif volontaire : WeasyPrint tire des bibliothèques système
+        # (Pango/Cairo). En l'important ici plutôt qu'au chargement du module, leur
+        # absence éventuelle (poste de dev Windows sans GTK) n'affecte QUE la
+        # génération du PDF — l'injection JSON/XML reste fonctionnelle, l'échec étant
+        # rattrapé et signalé comme non bloquant par InjectionService.
+        from weasyprint import HTML
+
         entries_by_date = self.extract_entries_by_date()
 
         # Construire le contenu HTML avec styles CSS améliorés
@@ -57,13 +67,19 @@ class PDFGenerator:
         <head>
         <meta charset="utf-8">
         <style>
-            body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
+            @page {
+                margin: 40px;
+                @bottom-right {
+                    content: "Page " counter(page) " / " counter(pages);
+                    font-size: 10px;
+                    color: #888;
+                }
+            }
+            body { font-family: Arial, sans-serif; line-height: 1.6; }
             h1 { text-align: center; font-size: 24px; color: #333; margin-bottom: 20px; }
             .date { margin-top: 30px; font-weight: bold; font-size: 18px; color: #222; }
             .entry { margin-top: 10px; margin-bottom: 30px; text-indent: 20px; }
             hr { border: none; border-top: 1px solid #ccc; margin: 20px 0; }
-            .footer { text-align: center; font-size: 12px; color: #888; position: fixed; bottom: 0; left: 0; right: 0; }
-            @page { margin: 40px; }
         </style>
         </head>
         <body>
@@ -75,21 +91,10 @@ class PDFGenerator:
             html_content += f"<div class='date'>Date: {date}</div>"
             html_content += f"<div class='entry'>{text}</div><hr>"
 
-        # Ajouter un pied de page
-        html_content += """
-        <div class='footer'>
-            Page <span class="pageNumber"></span> of <span class="totalPages"></span>
-        </div>
-        """
-
         html_content += "</body></html>"
 
-        # Générer le PDF
-        pdfkit.from_string(html_content, self.output_pdf_path, options={
-            'footer-right': '[page] / [topage]',  # Numérotation des pages
-            'footer-font-size': '10',
-            'encoding': 'UTF-8'
-        })
+        # Générer le PDF (le pied de page/numérotation est géré par le CSS @page).
+        HTML(string=html_content).write_pdf(self.output_pdf_path)
 
     def run(self):
         """Execute the process of extracting entries and generating the PDF.

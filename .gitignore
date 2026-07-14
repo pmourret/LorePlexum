@@ -13,6 +13,10 @@
 # Le gabarit .env.struct reste versionné ; seul le .env réel est ignoré.
 .env
 
+# --- Déploiement Docker : secrets réels ignorés, gabarits .example versionnés ---
+/deploy/.env
+/deploy/app.env
+
 # --- IDE ---
 /.idea/
 

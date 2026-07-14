@@ -1,0 +1,26 @@
+# L'image ne doit contenir que le code : ni venv, ni données locales, ni secrets.
+.venv/
+venv/
+.git/
+.gitignore
+.idea/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Données et sorties locales (elles vivent sur des volumes, pas dans l'image).
+/input/
+/output/
+/data/
+*.db
+
+# Configuration / secrets locaux (fournis au conteneur via env_file / volumes).
+.env
+deploy/app.env
+deploy/.env
+
+# Doc et scripts propres au poste Windows.
+run_web.ps1
+run_tnfc.ps1
+*.md

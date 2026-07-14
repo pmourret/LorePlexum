@@ -6,7 +6,11 @@
       "Bash(python -m pip install httpx)",
       "Bash(cd \"d:/Projects/Python/TNFCDataInjector_v2\")",
       "Bash(export PYTHONIOENCODING=utf-8)",
-      "Bash(.venv/Scripts/python.exe -c \"import ast; [ast.parse\\(open\\(f,encoding='utf-8'\\).read\\(\\)\\) for f in ['src/EnvLoader.py','src/LorePlexum.py','webapp/settings.py','webapp/main.py','src/InjectionService.py']]; print\\('syntax OK'\\)\")"
+      "Bash(.venv/Scripts/python.exe -c \"import ast; [ast.parse\\(open\\(f,encoding='utf-8'\\).read\\(\\)\\) for f in ['src/EnvLoader.py','src/LorePlexum.py','webapp/settings.py','webapp/main.py','src/InjectionService.py']]; print\\('syntax OK'\\)\")",
+      "Bash(python -c \"import weasyprint; print\\('weasyprint', weasyprint.__version__\\)\")",
+      "Bash(python -c \"import weasyprint\")",
+      "Bash(./.venv/Scripts/python.exe -c ' *)",
+      "Bash(./.venv/Scripts/python.exe -c \"print\\(open\\('requirements.txt',encoding='utf-8'\\).read\\(\\)[:60]\\)\")"
     ]
   }
 }

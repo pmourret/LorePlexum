@@ -89,12 +89,15 @@ sert donc l'interface web et l'adaptateur CLI.
 ## Prérequis
 
 - **Python 3.12+**
-- **wkhtmltopdf** — binaire externe requis par `pdfkit` pour générer les PDF.
-  **Il n'est pas installable via pip.**
-  - Téléchargement : <https://wkhtmltopdf.org/downloads.html>
-  - Sous Windows, il doit être accessible dans le `PATH` (chemin par défaut :
-    `C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe`).
-  - En son absence, l'injection réussit quand même ; seule la génération du PDF
+- **WeasyPrint** — moteur de génération PDF, installé via pip (`requirements.txt`).
+  Il ne requiert **aucun binaire externe** (il a remplacé `pdfkit`/`wkhtmltopdf`),
+  mais s'appuie sur des **bibliothèques système** (Pango/Cairo/gdk-pixbuf).
+  - **En production Docker** : ces libs sont fournies par l'image (rien à faire),
+    voir [deploy/DEPLOYMENT.md](deploy/DEPLOYMENT.md).
+  - **En dev sous Windows** : les libs GTK ne sont pas présentes par défaut ;
+    l'app démarre quand même, mais la génération du PDF est indisponible tant
+    qu'elles ne sont pas installées (voir la doc WeasyPrint pour Windows).
+  - En leur absence, l'injection réussit malgré tout ; seule la génération du PDF
     échoue (signalée dans le journal d'exécution, non bloquante).
 
 ---
@@ -111,12 +114,20 @@ pip install -r requirements.txt
 Dépendances Python (voir `requirements.txt`) :
 
 - `fastapi`, `uvicorn`, `jinja2`, `python-multipart` — interface web
-- `pdfkit` — génération PDF (nécessite **wkhtmltopdf**, cf. [Prérequis](#prérequis))
+- `weasyprint` — génération PDF (libs système Pango/Cairo, cf. [Prérequis](#prérequis))
 - `python-dotenv` — chargement du `.env`
 - `colorama`, `emoji`, `pyperclip` — utilisés par l'adaptateur CLI déprécié
 
 HTMX est **vendorisé** dans `webapp/static/htmx.min.js` : aucune connexion Internet
 n'est requise pour utiliser l'interface.
+
+### Déploiement conteneurisé (Docker)
+
+L'application peut être conteneurisée et déployée sur un serveur Docker distinct
+(qui écrit sur le partage SMB), l'image embarquant WeasyPrint et ses libs système.
+Voir [deploy/DEPLOYMENT.md](deploy/DEPLOYMENT.md) : `Dockerfile`, `docker-compose.yml`
+(montage CIFS du partage + volume SQLite persistant) et l'étape de jonction de
+répertoire côté PC de jeu pour partager le XML TakeNotes sans copie manuelle.
 
 ---
 
@@ -299,7 +310,7 @@ n'a pas d'équivalent côté web.
 | Symptôme | Cause probable / solution |
 |---|---|
 | La page Injecter affiche un avertissement de configuration | Un ou plusieurs chemins du `.env` sont vides ou introuvables. Corrigez-les dans **Paramètres** (les champs fautifs sont marqués ❌). |
-| Échec de génération du PDF | **wkhtmltopdf** non installé ou absent du `PATH` (cf. [Prérequis](#prérequis)). L'injection réussit malgré tout. |
+| Échec de génération du PDF | Bibliothèques système de **WeasyPrint** (Pango/Cairo) absentes — fréquent en dev Windows (cf. [Prérequis](#prérequis)). En Docker, elles sont dans l'image. L'injection réussit malgré tout. |
 | « Doublon détecté » alors que je veux réinjecter | Le texte a déjà été archivé. Utilisez **« Injecter malgré tout »** pour forcer. |
 | `Texte après 'Text :' non trouvé` | Le contenu collé n'a pas de section `Text :`. |
 | Le résumé est vide | Section `Resume :` absente (avertissement, non bloquant). |

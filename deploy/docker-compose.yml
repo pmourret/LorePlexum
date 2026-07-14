@@ -1,0 +1,43 @@
+# Déploiement de TNFCDataInjector sur le serveur Docker « hiatus ».
+#
+# - L'app tourne dans le conteneur et écrit sur le partage SMB « auditus », monté
+#   en CIFS dans le volume `auditus` (-> /mnt/auditus dans le conteneur).
+# - La base d'archivage SQLite vit dans un volume Docker nommé (persistant).
+#
+# Deux fichiers d'environnement (voir les .example à côté) :
+#   - .env      : lu automatiquement par Docker Compose pour l'interpolation
+#                 ${...} ci-dessous (identifiants SMB, hôte, partage). NE PAS
+#                 versionner (secrets).
+#   - app.env   : configuration de l'APPLICATION (chemins Linux vers /mnt/auditus),
+#                 injectée dans le conteneur via env_file.
+#
+# Prérequis sur l'hôte hiatus : module noyau CIFS disponible (paquet cifs-utils).
+
+services:
+  tnfc:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: tnfc-injector:latest
+    container_name: tnfc-injector
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - app.env
+    volumes:
+      - auditus:/mnt/auditus
+      - tnfc-data:/data
+
+volumes:
+  # Partage SMB auditus monté directement par Docker (driver local + CIFS).
+  auditus:
+    driver: local
+    driver_opts:
+      type: cifs
+      o: "username=${SMB_USER},password=${SMB_PASSWORD},uid=1000,gid=1000,vers=3.0,file_mode=0664,dir_mode=0775,iocharset=utf8"
+      device: "//${SMB_HOST}/${SMB_SHARE}"
+
+  # Base SQLite (historique + anti-doublon) : persistée hors de l'image.
+  tnfc-data:
+    driver: local
