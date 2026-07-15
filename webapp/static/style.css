@@ -18,6 +18,9 @@
     --radius: 10px;
     --serif: Georgia, "Times New Roman", serif;
     --sans: "Segoe UI", system-ui, -apple-system, sans-serif;
+    /* Contrôles natifs (flèches des champs nombre, popups des <select>) rendus en
+       sombre pour rester cohérents avec le thème « grimoire ». */
+    color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -75,7 +78,7 @@ h3 { font-size: 14px; color: var(--ink-soft); }
 label { display: block; margin: 14px 0; font-size: 13px; color: var(--ink-soft); }
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 @media (max-width: 620px) { .row { grid-template-columns: 1fr; } }
-input[type=text], select, textarea {
+input[type=text], input[type=number], select, textarea {
     width: 100%; margin-top: 6px;
     background: #17130d; color: var(--ink);
     border: 1px solid var(--border); border-radius: 8px;
