@@ -14,6 +14,14 @@ Catégories utilisées : **Ajouté**, **Modifié**, **Corrigé**, **Supprimé**,
 ## [Non publié]
 
 ### Ajouté
+- **Calendrier tamrielien pour la date de session** (`src/TamrielicCalendar.py`) :
+  le champ date libre est remplacé par des menus déroulants structurés (Mois, Jour,
+  Ère, Année) reprenant les 12 mois du calendrier de *The Elder Scrolls*
+  (Morning Star → Evening Star). Le formulaire assemble une date au format anglais
+  compatible avec les XML existants (« Evening Star, 15th, 4E 201 »). Les menus sont
+  pré-remplis à partir de la dernière date connue de la catégorie, en la décomposant
+  (parsing tolérant aux anciens formats et aux noms de mois français). Réf. :
+  <https://lagbt.wiwiland.net/index.php?title=Calendrier_tamrielien>.
 - **Conteneurisation & déploiement Docker** (`Dockerfile`, `.dockerignore`,
   `deploy/`) : l'application peut tourner sur un serveur Docker distinct (ex.
   « hiatus ») et écrire sur le partage SMB (ex. « auditus ») monté en CIFS dans le
@@ -27,6 +35,12 @@ Catégories utilisées : **Ajouté**, **Modifié**, **Corrigé**, **Supprimé**,
   copie manuelle.
 
 ### Modifié
+- **Fin des balises `Resume :` / `Text :` dans le formulaire web** : l'interface
+  propose désormais deux champs distincts — **Résumé** (facultatif) et **Texte du
+  journal** (obligatoire) — au lieu d'un unique champ où il fallait baliser les
+  sections. Le découpage par balises subsiste uniquement dans le CLI (déprécié), qui
+  lit un texte brut ; `InjectionRequest` porte maintenant `resume` et `text` séparés,
+  et `InjectionService` ne parse plus lui-même.
 - **Génération PDF migrée de `pdfkit`/wkhtmltopdf vers WeasyPrint** : plus aucun
   binaire externe à installer (WeasyPrint est pur Python, s'appuyant sur des libs
   système Pango/Cairo fournies par l'image Docker). L'import de WeasyPrint est

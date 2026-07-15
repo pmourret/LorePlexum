@@ -20,12 +20,16 @@
 </div>
 <form hx-post="/inject" hx-target="#result" hx-swap="innerHTML">
     <input type="hidden" name="category" value="{{ form.category }}">
-    <input type="hidden" name="raw_text" value="{{ form.raw_text }}">
+    <input type="hidden" name="resume" value="{{ form.resume }}">
+    <input type="hidden" name="text" value="{{ form.text }}">
     <input type="hidden" name="arc_select" value="{{ form.arc_select }}">
     <input type="hidden" name="new_arc" value="{{ form.new_arc }}">
     <input type="hidden" name="metadata_file" value="{{ form.metadata_file }}">
     <input type="hidden" name="metadata_json" value="{{ form.metadata_json }}">
-    <input type="hidden" name="entry_date" value="{{ form.entry_date }}">
+    <input type="hidden" name="date_era" value="{{ form.date_era }}">
+    <input type="hidden" name="date_year" value="{{ form.date_year }}">
+    <input type="hidden" name="date_month" value="{{ form.date_month }}">
+    <input type="hidden" name="date_day" value="{{ form.date_day }}">
     <input type="hidden" name="allow_duplicate" value="1">
     <button type="submit" class="btn danger">Injecter malgré tout</button>
     <a class="btn small" href="/injection/{{ result.duplicate.id }}">Voir l'injection existante</a>

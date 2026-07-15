@@ -25,9 +25,13 @@
             </select>
         </label>
 
-        <label>Texte enrichi
-            <textarea name="raw_text" rows="12" placeholder="Resume : bref résumé…&#10;&#10;Text : corps complet du journal enrichi…"></textarea>
-            <small>Colle ici le texte enrichi. Sections <code>Resume :</code> (optionnelle) et <code>Text :</code> (obligatoire).</small>
+        <label>Résumé <span class="muted">(facultatif)</span>
+            <textarea name="resume" rows="3" placeholder="Bref résumé de l'entrée, une ou deux phrases…"></textarea>
+        </label>
+
+        <label>Texte du journal <span class="req">*</span>
+            <textarea name="text" rows="12" placeholder="Corps complet du journal enrichi…"></textarea>
+            <small>Colle directement le texte : plus besoin de balises <code>Resume :</code> / <code>Text :</code>.</small>
         </label>
 
         <div class="row">

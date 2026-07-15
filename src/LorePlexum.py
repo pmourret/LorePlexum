@@ -21,6 +21,7 @@ from src.EnvLoader import EnvLoader
 from src.FileChooser import FileChooser
 from src.ShellPrinter import ShellPrinter
 from src.Reporter import Reporter
+from src.DataExtractor import DataExtractor
 from src.InjectionService import InjectionService, InjectionRequest, XML_FILES_MAPPING
 
 # Sous-dossier d'archivage des fichiers traités, commun aux entrées et aux métadonnées.
@@ -39,6 +40,10 @@ class TNFCDataInjector:
 
         # Reporter avec écho console : les logs du service s'affichent en direct.
         self.reporter = Reporter(echo=True)
+        # Le CLI lit un texte brut (presse-papiers ou fichier) : il découpe encore
+        # les sections Resume/Text par balises avant de remplir la requête, là où le
+        # web dispose désormais de deux champs distincts.
+        self.data_extractor = DataExtractor(self.reporter)
         self.service = InjectionService(
             self.paths, pdf_export_file=env.pdf_export_file, reporter=self.reporter
         )
@@ -119,11 +124,16 @@ class TNFCDataInjector:
             arc = self.choose_arc()
             entry_date = self.choose_date(category)
 
+            # Découpage des sections Resume/Text du texte brut (balises), puis envoi
+            # des deux champs séparés au service (qui ne parse plus lui-même).
+            resume_text, main_text = self.data_extractor.extract_text_sections_from_content(raw_text)
+
             # Métadonnées abandonnées (vestige V1/ChatGPT) : on n'en demande plus.
             # Le service utilise {} par défaut.
             request = InjectionRequest(
                 category=category,
-                raw_text=raw_text,
+                resume=resume_text,
+                text=main_text,
                 arc=arc,
                 entry_date=entry_date,
             )

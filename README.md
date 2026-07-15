@@ -33,8 +33,9 @@ injection en base de données** (historique cherchable, détection des doublons)
 
 1. **Session Skyrim jouée.**
 2. **Prise de notes in-game** via le mod TakeNotes → export au format XML.
-3. **Enrichissement narratif** du texte par une IA (Grok) → texte formaté avec des
-   sections `Resume :` et `Text :`.
+3. **Enrichissement narratif** du texte par une IA (Grok) → un résumé et un corps de
+   journal (collés dans deux champs distincts côté web ; balises `Resume :` / `Text :`
+   pour le CLI déprécié).
 4. **Injection via l'interface web** → réinjecte le texte enrichi :
    - dans `full_context.json` (structure `character_arc > arc > journals`) ;
    - dans le fichier XML d'export TakeNotes de la catégorie choisie.
@@ -61,7 +62,8 @@ sert donc l'interface web et l'adaptateur CLI.
 | `src/Reporter.py` | Collecte les messages `(niveau, texte)` du pipeline (écho console optionnel). Remplace `ShellPrinter` dans le métier. |
 | `src/Database.py` (`InjectionDatabase`) | Archivage SQLite des injections + détection de doublons (empreinte SHA-256). |
 | `src/EnvLoader.py` | Chargement / validation des variables d'environnement (`.env`). |
-| `src/DataExtractor.py` | Extraction des sections `Resume :` / `Text :` d'un texte. |
+| `src/DataExtractor.py` | Extraction des sections `Resume :` / `Text :` d'un texte brut (utilisé par le **CLI déprécié** ; le web fournit deux champs séparés). |
+| `src/TamrielicCalendar.py` | Calendrier de jeu (*The Elder Scrolls*) : mois, ères, jours ; formatage/parsing d'une date de session. |
 | `src/JSONInjector.py` | Chargement, injection et sauvegarde du JSON de contexte. `list_arcs()` / `resolve_arc()`. |
 | `src/XMLInjector.py` | Injection du texte dans le XML TakeNotes. Date et segmentation en paramètres ; `get_last_date()`. |
 | `src/PDFExtractor.py` (`PDFGenerator`) | Génère un PDF récapitulatif à partir du XML. |
@@ -183,14 +185,15 @@ Un formulaire unique regroupe tous les choix (jadis des questions successives da
 le terminal) :
 
 1. **Catégorie** (`journal`, `bestiaire`, `quetes`, `personnages`, `divers`).
-2. **Texte enrichi** collé directement dans la zone de texte (sections `Resume :`
-   optionnelle et `Text :` obligatoire).
+2. **Résumé** *(facultatif)* et **Texte du journal** *(obligatoire)* : deux champs
+   distincts collés directement — plus aucune balise `Resume :` / `Text :` à saisir.
 3. **Arc** narratif : sélection d'un arc existant, ou saisie d'un nom pour créer un
    nouvel arc (laisser vide = nouvel arc auto-numéroté).
 4. **Métadonnées** *(facultatif, hérité de la V1/ChatGPT)* : bloc dépliable ;
    choix d'un fichier de `METADATAS_DIR` **ou** JSON collé. Peut rester vide.
-5. **Date de la session** (calendrier du jeu, ex. `Evening Star, 15th, 4E 201`),
-   pré-remplie avec la dernière date connue de la catégorie.
+5. **Date de la session** — menus déroulants du **calendrier tamrielien** (Mois,
+   Jour, Ère, Année), assemblés en `Evening Star, 15th, 4E 201`, pré-remplis avec la
+   dernière date connue de la catégorie.
 
 Le bouton **Injecter** exécute JSON + XML + PDF et affiche le **journal d'exécution**
 coloré ainsi qu'un lien de téléchargement du PDF. Si le `.env` est invalide, la page
@@ -232,10 +235,13 @@ réseau où résident les JSON/XML.
 
 ### Texte enrichi
 
-Deux sections attendues. `Resume :` est **optionnel** (un avertissement s'affiche
-s'il est absent) ; `Text :` est **obligatoire**. Les labels tolèrent les accents et
-la casse (`Resume`/`Résumé`, `Text`/`Texte`). Chaque section se termine à la
-première ligne vide (double saut de ligne) ou en fin de contenu.
+Un **résumé** (facultatif) et un **texte de journal** (obligatoire).
+
+- **Interface web** : deux champs séparés — rien à baliser.
+- **CLI déprécié** : le texte brut (presse-papiers ou fichier) doit contenir les
+  sections `Resume :` (optionnelle) et `Text :` (obligatoire). Les labels tolèrent
+  les accents et la casse (`Resume`/`Résumé`, `Text`/`Texte`) ; chaque section se
+  termine à la première ligne vide (double saut de ligne) ou en fin de contenu.
 
 ```text
 Resume : Bref résumé de l'entrée, une ou deux phrases.
@@ -312,7 +318,7 @@ n'a pas d'équivalent côté web.
 | La page Injecter affiche un avertissement de configuration | Un ou plusieurs chemins du `.env` sont vides ou introuvables. Corrigez-les dans **Paramètres** (les champs fautifs sont marqués ❌). |
 | Échec de génération du PDF | Bibliothèques système de **WeasyPrint** (Pango/Cairo) absentes — fréquent en dev Windows (cf. [Prérequis](#prérequis)). En Docker, elles sont dans l'image. L'injection réussit malgré tout. |
 | « Doublon détecté » alors que je veux réinjecter | Le texte a déjà été archivé. Utilisez **« Injecter malgré tout »** pour forcer. |
-| `Texte après 'Text :' non trouvé` | Le contenu collé n'a pas de section `Text :`. |
-| Le résumé est vide | Section `Resume :` absente (avertissement, non bloquant). |
+| `Texte après 'Text :' non trouvé` (CLI) | Le contenu collé n'a pas de section `Text :`. Côté web, remplissez le champ **Texte du journal**. |
+| Le résumé est vide | Champ **Résumé** laissé vide côté web, ou section `Resume :` absente côté CLI (avertissement, non bloquant). |
 | `Le fichier XML ... n'existe pas` | `TAKE_NOTES_EXPORT_DIR` incorrect ou fichier `ExportChapterN.xml` manquant. |
 | Le port 8000 est déjà utilisé | Lancez Uvicorn sur un autre port : `--port 8001`. |

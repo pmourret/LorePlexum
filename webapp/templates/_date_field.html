@@ -1,5 +1,28 @@
-<label id="date-field">Date de la session (calendrier de jeu)
-    <input type="text" name="entry_date" value="{{ default_date }}"
-           placeholder="ex. Evening Star, 15th, 4E 201">
-    <small>Pré-remplie avec la dernière date connue de la catégorie ; modifiable.</small>
-</label>
+<div id="date-field" class="date-block">
+    <span class="date-legend">Date de la session (calendrier tamrielien)</span>
+    <div class="date-grid">
+        <label>Mois
+            <select name="date_month"
+                    hx-get="/date-days" hx-target="#day-field" hx-swap="outerHTML"
+                    hx-trigger="change" hx-include="[name='date_day']">
+                {% for i, name in months %}
+                <option value="{{ i }}" {% if i == sel.month_index %}selected{% endif %}>{{ name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Jour
+            {% include "_day_field.html" %}
+        </label>
+        <label>Ère
+            <select name="date_era">
+                {% for e in eras %}
+                <option value="{{ e }}" {% if e == sel.era %}selected{% endif %}>{{ e }}E</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Année
+            <input type="number" name="date_year" min="1" value="{{ sel.year }}">
+        </label>
+    </div>
+    <small>Ex. « Evening Star, 15th, 4E 201 ». Pré-remplie avec la dernière date connue de la catégorie ; modifiable.</small>
+</div>

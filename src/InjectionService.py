@@ -17,7 +17,6 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from src.Reporter import Reporter
-from src.DataExtractor import DataExtractor
 from src.JSONInjector import JSONInjector
 from src.XMLInjector import XMLInjector
 from src.PDFExtractor import PDFGenerator
@@ -37,9 +36,16 @@ XML_FILES_MAPPING = {
 
 @dataclass
 class InjectionRequest:
-    """Tous les paramètres d'une injection, collectés en amont (formulaire web)."""
+    """Tous les paramètres d'une injection, collectés en amont (formulaire web).
+
+    Le résumé et le texte arrivent désormais dans deux champs distincts : plus
+    besoin de balises `Resume :` / `Text :` dans un texte unique. Le CLI, qui lit
+    un texte brut, réalise le découpage en amont (voir `DataExtractor`) avant de
+    remplir cette requête.
+    """
     category: str                       # clé de XML_FILES_MAPPING
-    raw_text: str                       # texte enrichi brut (sections Resume:/Text:)
+    resume: str = ""                    # résumé de l'entrée (optionnel)
+    text: str = ""                     # corps du journal (obligatoire)
     metadata: dict = field(default_factory=dict)
     arc: Optional[str] = None           # arc cible ; None/"" -> nouvel arc auto
     entry_date: Optional[str] = None    # date calendrier de jeu ; "" -> dernière connue
@@ -78,7 +84,6 @@ class InjectionService:
         self.pdf_export_file = pdf_export_file or os.getenv("PDF_EXPORT_FILE")
         self.db = db
 
-        self.data_extractor = DataExtractor(self.reporter)
         self.json_injector = JSONInjector(paths['full_context_json_path'], self.reporter)
         self.xml_injector = XMLInjector(paths['take_notes_export_dir'], self.reporter)
 
@@ -130,10 +135,15 @@ class InjectionService:
 
             xml_file_path = os.path.join(self.xml_injector.export_dir, xml_file_name)
 
-            # 1. Extraire les sections Resume/Text du texte enrichi fourni.
-            resume_text, main_text = self.data_extractor.extract_text_sections_from_content(
-                request.raw_text
-            )
+            # 1. Résumé et texte arrivent déjà séparés (deux champs) : aucun parsing
+            # par balises. Le résumé est optionnel ; le texte principal est requis.
+            resume_text = (request.resume or "").strip()
+            main_text = (request.text or "").strip()
+            if not resume_text:
+                self.reporter.warning("Aucun résumé fourni : le résumé sera vide.")
+            if not main_text:
+                self.reporter.error("Le texte principal est vide.")
+                return self._fail(request.category, xml_file_name)
 
             # 1bis. Détection de doublon (avant toute écriture). Le hash porte sur le
             # texte injecté : un texte déjà traité est signalé, à moins que l'appelant

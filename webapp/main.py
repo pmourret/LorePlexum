@@ -20,6 +20,7 @@ from src.Database import InjectionDatabase
 from src.InjectionService import InjectionService, InjectionRequest, XML_FILES_MAPPING
 from src.EnvLoader import EnvLoader
 from src.FileChooser import FileChooser
+from src import TamrielicCalendar as calendar
 from webapp import settings as settings_module
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -53,6 +54,39 @@ def config_error():
     return "Configuration incomplète ou invalide. Renseignez les chemins dans Paramètres."
 
 
+def _date_field_context(date_str):
+    """Contexte du champ date (menus du calendrier tamrielien) pré-rempli.
+
+    `date_str` est la dernière date connue de la catégorie (ou ""). On la décompose
+    en composants pour pré-sélectionner ère / année / mois / jour.
+    """
+    sel = calendar.components_or_default(date_str)
+    return {
+        "eras": calendar.ERAS,
+        "months": list(enumerate(calendar.month_names_en())),
+        "sel": sel,
+        # Bornes du menu « jour » ajustées au mois pré-sélectionné (voir /date-days).
+        "max_day": calendar.days_in_month(sel["month_index"]),
+        "sel_day": sel["day"],
+    }
+
+
+def _assemble_date(date_era, date_year, date_month, date_day):
+    """Reconstruit la date stockée « Evening Star, 15th, 4E 201 » depuis les menus.
+
+    Tolérant aux saisies vides/invalides : retombe alors sur les valeurs par défaut.
+    """
+    d = dict(calendar.DEFAULT)
+    try:
+        d["era"] = int(date_era)
+        d["year"] = int(date_year)
+        d["month_index"] = int(date_month)
+        d["day"] = calendar.clamp_day(int(date_month), int(date_day))
+    except (TypeError, ValueError):
+        pass
+    return calendar.format_date(d["era"], d["year"], d["month_index"], d["day"])
+
+
 # --- Accueil -------------------------------------------------------------------
 
 @app.get("/", response_class=HTMLResponse)
@@ -78,7 +112,7 @@ def inject_form(request: Request):
     return templates.TemplateResponse("inject.html", {
         "request": request, "active": "inject", "config_error": err,
         "categories": categories, "arcs": arcs,
-        "metadata_files": metadata_files, "default_date": default_date,
+        "metadata_files": metadata_files, **_date_field_context(default_date),
     })
 
 
@@ -94,7 +128,23 @@ def suggest_date(request: Request, category: str):
     except Exception:
         pass
     return templates.TemplateResponse("_date_field.html", {
-        "request": request, "default_date": value,
+        "request": request, **_date_field_context(value),
+    })
+
+
+@app.get("/date-days", response_class=HTMLResponse)
+def date_days(request: Request, date_month: int = 0, date_day: int = 1):
+    """Renvoie le menu « jour » ajusté au mois choisi (28 à 31 jours).
+
+    Déclenché par HTMX au changement de mois. Le jour courant est conservé, ramené
+    au dernier jour du mois s'il le dépasse (ex. 31 en Sun's Dawn -> 28).
+    """
+    if not 0 <= date_month < len(calendar.MONTHS):
+        date_month = 0
+    return templates.TemplateResponse("_day_field.html", {
+        "request": request,
+        "max_day": calendar.days_in_month(date_month),
+        "sel_day": calendar.clamp_day(date_month, date_day),
     })
 
 
@@ -102,12 +152,16 @@ def suggest_date(request: Request, category: str):
 def inject_submit(
     request: Request,
     category: str = Form(...),
-    raw_text: str = Form(""),
+    resume: str = Form(""),
+    text: str = Form(""),
     arc_select: str = Form(""),
     new_arc: str = Form(""),
     metadata_file: str = Form(""),
     metadata_json: str = Form(""),
-    entry_date: str = Form(""),
+    date_era: str = Form(""),
+    date_year: str = Form(""),
+    date_month: str = Form(""),
+    date_day: str = Form(""),
     allow_duplicate: str = Form(""),
 ):
     """Exécute une injection et renvoie le fragment de résultat (HTMX)."""
@@ -136,9 +190,13 @@ def inject_submit(
             {"level": "error", "message": meta_err}
         ])
 
+    # La date arrive découpée (menus du calendrier) : on la reconstitue en chaîne.
+    entry_date = _assemble_date(date_era, date_year, date_month, date_day)
+
     req = InjectionRequest(
         category=category,
-        raw_text=raw_text,
+        resume=resume,
+        text=text,
         metadata=metadata,
         arc=arc,
         entry_date=entry_date,
@@ -151,10 +209,11 @@ def inject_submit(
         "result": result,
         # On renvoie les champs pour permettre le « forcer » sans re-saisie.
         "form": {
-            "category": category, "raw_text": raw_text,
+            "category": category, "resume": resume, "text": text,
             "arc_select": arc_select, "new_arc": new_arc,
             "metadata_file": metadata_file, "metadata_json": metadata_json,
-            "entry_date": entry_date,
+            "date_era": date_era, "date_year": date_year,
+            "date_month": date_month, "date_day": date_day,
         },
     })
 

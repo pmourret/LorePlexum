@@ -1,0 +1,5 @@
+<select id="day-field" name="date_day">
+    {% for d in range(1, max_day + 1) %}
+    <option value="{{ d }}" {% if d == sel_day %}selected{% endif %}>{{ d }}</option>
+    {% endfor %}
+</select>
