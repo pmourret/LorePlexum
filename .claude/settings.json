@@ -13,7 +13,11 @@
       "Bash(./.venv/Scripts/python.exe -c \"print\\(open\\('requirements.txt',encoding='utf-8'\\).read\\(\\)[:60]\\)\")",
       "WebFetch(domain:lagbt.wiwiland.net)",
       "Bash(python -c ' *)",
-      "Bash(python -c \"import webapp.main as m; print\\('webapp.main import OK'\\); print\\('routes:', sorted\\({r.path for r in m.app.routes if hasattr\\(r,'path'\\)}\\)\\)\")"
+      "Bash(python -c \"import webapp.main as m; print\\('webapp.main import OK'\\); print\\('routes:', sorted\\({r.path for r in m.app.routes if hasattr\\(r,'path'\\)}\\)\\)\")",
+      "Bash(python -c \"import ast; [ast.parse\\(open\\(f,encoding='utf-8'\\).read\\(\\),f\\) for f in ['src/FissDocument.py','src/XMLInjector.py','src/PDFExtractor.py']]; print\\('syntax OK'\\)\")",
+      "Bash(python -m unittest discover -s tests -v)",
+      "Bash(python -c \"import src.FissDocument, src.XMLInjector, src.PDFExtractor, src.InjectionService; print\\('all imports OK'\\)\")",
+      "Bash(python -m unittest discover -s tests)"
     ]
   }
 }

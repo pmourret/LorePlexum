@@ -65,7 +65,8 @@ sert donc l'interface web et l'adaptateur CLI.
 | `src/DataExtractor.py` | Extraction des sections `Resume :` / `Text :` d'un texte brut (utilisé par le **CLI déprécié** ; le web fournit deux champs séparés). |
 | `src/TamrielicCalendar.py` | Calendrier de jeu (*The Elder Scrolls*) : mois, ères, jours ; formatage/parsing d'une date de session. |
 | `src/JSONInjector.py` | Chargement, injection et sauvegarde du JSON de contexte. `list_arcs()` / `resolve_arc()`. |
-| `src/XMLInjector.py` | Injection du texte dans le XML TakeNotes. Date et segmentation en paramètres ; `get_last_date()`. |
+| `src/FissDocument.py` | **Couche pivot** du format XML FISS/TakeNotes : seule porte d'entrée/sortie du format brut. Lecture *tolérante* (casse, déclaration parasite), écriture *strictement native* (une ligne, pas de déclaration, échappement `&apos;`/`&#x0D;`…), comptage par scan séquentiel `Date{N}`/`entry{N}`, `.bak` avant écrasement, échec bruyant sur XML corrompu. |
+| `src/XMLInjector.py` | Injection du texte dans le XML TakeNotes (délègue tout le format à `FissDocument`). Date et segmentation en paramètres ; `get_last_date()`. |
 | `src/PDFExtractor.py` (`PDFGenerator`) | Génère un PDF récapitulatif à partir du XML. |
 | `src/FileChooser.py` | Utilitaire `list_files()` (listing d'un dossier). |
 
@@ -274,10 +275,40 @@ directement** au lieu d'être choisi parmi les fichiers.
 | `personnages` | `ExportChapter4.xml` |
 | `divers` | `ExportChapter5.xml` |
 
-Structure XML TakeNotes (section `<Data>`) : paires `<dateN>` / `<entryN>` et un
+Structure XML TakeNotes (section `<Data>`) : paires `<DateN>` / `<entryN>` et un
 compteur `<NumberOfEntries>`. Une entrée contenant `todo` est remplacée en priorité ;
-sinon de nouvelles paires `dateN`/`entryN` sont ajoutées à la suite. Les textes trop
+sinon de nouvelles paires `DateN`/`entryN` sont ajoutées à la suite. Les textes trop
 longs sont découpés en segments (`MAX_TOKENS_PER_ENTRY`) sans couper les mots.
+
+### Format natif FISS — pièges à connaître
+
+Le format XML brut du mod TakeNotes/FISS n'a **aucun schéma officiel**. Son analyse
+sur des exports réels (`samples/`) a révélé des pièges que la couche pivot
+`src/FissDocument.py` neutralise — **à ne jamais réintroduire ailleurs** :
+
+- **`<NumberOfEntries>` n'est PAS le nombre d'entrées.** C'est l'**index de la
+  prochaine entrée à écrire** (= nombre réel **+ 1**), jamais décrémenté quand une
+  entrée est supprimée in-game (donc parfois trop grand). Vérifié 5/5 sur des
+  exports frais. ⇒ On ne le lit **jamais** pour compter : le nombre réel vient du
+  **scan séquentiel** des paires `Date{N}`/`entry{N}` depuis 1 jusqu'à la première
+  paire manquante. En écriture il est **recalculé** à `entrées + 1` (`1` si vide).
+- **Casse asymétrique volontaire** : le jeu écrit `<Date1>` (D **majuscule**) mais
+  `<entry1>` (e **minuscule**). Reproduit à la lettre en écriture ; les deux casses
+  sont tolérées en lecture (fichiers *legacy*).
+- **Ne jamais « joliment indenter » un XML avant réimport.** Le format natif tient
+  sur **une seule ligne**, sans déclaration `<?xml ?>`, avec un échappement précis
+  (`&apos;`, `&quot;`, `&gt;`, `&#x0D;` pour les retours à la ligne). Un export
+  repassé dans un pretty-printer externe (type Notepad++ XML Tools) est **dégradé**
+  et a déjà, dans l'historique du projet, **perdu une entrée** face à l'export natif
+  équivalent. La couche pivot écrit toujours en format natif et ne reformate jamais.
+- **Filets de sécurité** : avant tout écrasement, l'original est copié en
+  `.<horodatage>.bak` ; et rien n'est écrit si la sortie ne se re-parse pas
+  (échec bruyant plutôt que silencieux).
+
+Tests de référence adossés aux 5 exports de `samples/` : `tests/` (lancer
+`python -m unittest discover -s tests`), couvrant chapitre vide / 1 entrée /
+plusieurs entrées, le round-trip natif octet-pour-octet et le recalcul de
+`<NumberOfEntries>`.
 
 ---
 

@@ -1,10 +1,10 @@
 from datetime import datetime
 
-from xml.etree import ElementTree as ET
 from collections import defaultdict
 import os
 import unicodedata
 
+from src.FissDocument import FissDocument, FissError
 from src.Reporter import Reporter
 
 
@@ -27,22 +27,24 @@ class PDFGenerator:
         return unicodedata.normalize("NFKD", text)
 
     def extract_entries_by_date(self):
-        """Extract and organize journal entries by date from the XML file."""
-        try:
-            tree = ET.parse(self.xml_file_path)
-            root = tree.getroot()
-            data_section = root.find("Data")
-            entries_by_date = defaultdict(list)
-            date_key = None
+        """Regroupe les entrées du journal par date à partir du XML FISS.
 
-            for element in data_section:
-                if element.tag.startswith("date"):
-                    date_key = element.text.strip()
-                elif element.tag.startswith("entry") and date_key:
-                    entries_by_date[date_key].append(self.normalize_text(element.text.strip()))
-            return {date: "<br>".join(entries) for date, entries in entries_by_date.items()}
-        except Exception as e:
+        Passe par la couche pivot ``FissDocument`` (scan séquentiel des paires
+        ``Date{N}``/``entry{N}``, casse tolérée en lecture) plutôt que de lire
+        ``ElementTree`` directement : l'ancienne version testait
+        ``tag.startswith("date")`` en minuscule et ne voyait donc AUCUNE date sur
+        un vrai export du jeu, qui utilise ``<Date1>`` (D majuscule).
+        """
+        try:
+            document = FissDocument.load(self.xml_file_path)
+        except FissError as e:
             raise ValueError(f"Erreur lors de l'extraction des données XML : {e}")
+
+        entries_by_date = defaultdict(list)
+        for entry in document.entries:
+            date_key = (entry.date or "").strip()
+            entries_by_date[date_key].append(self.normalize_text((entry.text or "").strip()))
+        return {date: "<br>".join(entries) for date, entries in entries_by_date.items()}
 
     def generate_pdf(self):
         """Génère le PDF à partir du HTML via WeasyPrint (pur Python + libs système).
