@@ -35,6 +35,15 @@ Catégories utilisées : **Ajouté**, **Modifié**, **Corrigé**, **Supprimé**,
   copie manuelle.
 
 ### Modifié
+- **Exposition en HTTPS derrière Traefik** (`deploy/`) : l'application passe du
+  suffixe DNS interne `*.core.home.arpa` — réservé par la RFC 8375, donc non
+  résolu par certains appareils du réseau — à `*.sternum-lab.duckdns.org`. Le
+  routeur Traefik écoute désormais sur l'entrypoint `websecure` avec le résolveur
+  de certificat `duckdns` (wildcard Let's Encrypt via challenge DNS-01, aucun port
+  ouvert sur internet). `APP_HOST` vaut par défaut
+  `loreplexum.sternum-lab.duckdns.org` (aligné sur le nom du routeur Traefik, de
+  l'image et du conteneur) et doit rester sur **un seul niveau** de sous-domaine,
+  sans quoi le certificat wildcard ne s'applique pas.
 - **Fin des balises `Resume :` / `Text :` dans le formulaire web** : l'interface
   propose désormais deux champs distincts — **Résumé** (facultatif) et **Texte du
   journal** (obligatoire) — au lieu d'un unique champ où il fallait baliser les

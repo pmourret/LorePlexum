@@ -18,7 +18,8 @@
       "Bash(python -m unittest discover -s tests -v)",
       "Bash(python -c \"import src.FissDocument, src.XMLInjector, src.PDFExtractor, src.InjectionService; print\\('all imports OK'\\)\")",
       "Bash(python -m unittest discover -s tests)",
-      "Bash(cat)"
+      "Bash(cat)",
+      "Bash(grep -n \"home.arpa\\\\|APP_HOST\\\\|entrypoint\\\\|websecure\\\\|http://\\\\|https://\\\\|certresolver\\\\|traefik\" deploy/DEPLOYMENT.md)"
     ]
   }
 }

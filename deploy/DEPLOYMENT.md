@@ -74,8 +74,14 @@ docker compose up -d --build
 docker compose logs -f        # vérifier le démarrage (validation des chemins .env)
 ```
 
-L'interface est ensuite accessible via Traefik sur `http://<APP_HOST>/`
-(ex. `http://tnfc.core.home.arpa/`), sans port à ouvrir sur l'hôte.
+L'interface est ensuite accessible via Traefik sur `https://<APP_HOST>/`
+(ex. `https://loreplexum.sternum-lab.duckdns.org/`), sans port à ouvrir sur l'hôte.
+Le certificat est le wildcard Let's Encrypt `*.sternum-lab.duckdns.org` émis par
+Traefik (résolveur `duckdns`, challenge DNS-01) : rien à faire côté application.
+
+> Traefik lit les labels **des conteneurs en cours d'exécution**, pas du fichier
+> compose sur disque. Après modification des labels, `docker compose up -d
+> --force-recreate` (un simple `restart` ne suffit pas).
 
 > Besoin d'un accès direct pour déboguer (hors Traefik) ? Ajoutez temporairement
 > `ports: ["8000:8000"]` au service dans `docker-compose.yml`.
