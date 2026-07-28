@@ -1,4 +1,4 @@
-# Déploiement Docker — TNFCDataInjector
+# Déploiement Docker — LorePlexum
 
 Ce document décrit le déploiement de l'application sur le serveur Docker
 **hiatus**, écrivant sur le serveur SMB **auditus**, sans rien installer sur le PC
@@ -12,9 +12,9 @@ de jeu et avec l'app disponible en permanence.
 │  /mnt/TakeNotes ───┼──────────────────────► │  _OUTPUT/ExportChapter1..5.xml ◄┐
 │    │ bind-mount    │                        │  _APP/ENTRIES                 │ │
 │    ▼               │                        │  _APP/FULL_CONTEXT_JSON       │ │
-│  conteneur FastAPI │                        │  _APP/METADATAS · PDF_OUTPUT  │ │
-│  + WeasyPrint      │                        └───────────────────────────────┼┘
-│  :8000 (Traefik)   │                                                        │ jonction
+│  backend  (FastAPI │                        │  _APP/METADATAS · PDF_OUTPUT  │ │
+│   + WeasyPrint)    │                        └───────────────────────────────┼┘
+│  frontend (nginx)  │                                                        │ jonction
 └────────────────────┘                        ┌───────────────────────────────┴┐
                                               │  PC de jeu (Skyrim)             │
                                               │  …/FISS/TakeNotes --> auditus   │
@@ -32,6 +32,24 @@ de jeu et avec l'app disponible en permanence.
   en réalité sur auditus. L'app et le jeu partagent donc le même fichier, **sans
   aucune copie manuelle**.
 - La base SQLite (historique + anti-doublon) vit dans un **volume Docker** nommé.
+- **Deux conteneurs**, départagés par le chemin sur le même host :
+
+  | Chemin | Service | Rôle |
+  |---|---|---|
+  | `/api/…` | `backend` | API FastAPI. Seul à monter le partage et les bases. |
+  | tout le reste | `frontend` | SPA React construite, servie par nginx. Aucun volume. |
+
+  La priorité des routers Traefik (`100` pour l'API, `1` pour le catch-all) fait
+  le tri. Comme les deux répondent sur le même host, le navigateur reste en
+  **same-origin** : aucune configuration CORS n'est nécessaire.
+
+> ### ⚠️ Accès — à lire avant toute exposition
+>
+> L'application n'a **aucune authentification applicative**, et `PUT /api/v1/settings`
+> écrit des chemins du système de fichiers. La restriction doit donc être posée au
+> niveau réseau, **avant** d'ouvrir l'accès : middleware `ipallowlist` Traefik,
+> VPN, ou Tailscale. C'est un choix assumé pour un outil mono-utilisateur ; il
+> cesse de l'être dès que l'URL est joignable depuis Internet.
 
 ---
 
@@ -88,11 +106,14 @@ aucune étape supplémentaire.
 | `make deploy` | `git pull` puis `make up` — le flux de mise à jour nominal |
 | `make recreate` | `docker compose up -d --build --force-recreate` |
 | `make down` / `restart` / `logs` / `ps` | les `docker compose` correspondants |
-| `make shell` | `docker compose exec tnfc /bin/bash` |
+| `make shell` | `docker compose exec backend /bin/sh` (`S=frontend` pour l'autre) |
+| `make logs S=backend` | logs d'un seul service ; sans `S`, les deux |
 | `make backup` | archive les bases SQLite du volume dans `deploy/backups/` |
 
 L'interface est ensuite accessible via Traefik sur `https://<APP_HOST>/`
 (ex. `https://loreplexum.sternum-lab.duckdns.org/`), sans port à ouvrir sur l'hôte.
+L'API répond sur `https://<APP_HOST>/api/v1/health` et sa documentation
+interactive sur `https://<APP_HOST>/api/docs`.
 Le certificat est le wildcard Let's Encrypt `*.sternum-lab.duckdns.org` émis par
 Traefik (résolveur `duckdns`, challenge DNS-01) : rien à faire côté application.
 
@@ -101,7 +122,13 @@ Traefik (résolveur `duckdns`, challenge DNS-01) : rien à faire côté applicat
 > --force-recreate` (un simple `restart` ne suffit pas).
 
 > Besoin d'un accès direct pour déboguer (hors Traefik) ? Ajoutez temporairement
-> `ports: ["8000:8000"]` au service dans `docker-compose.yml`.
+> `ports: ["8000:8000"]` au service `backend` (ou `["8080:80"]` au `frontend`)
+> dans `docker-compose.yml`.
+
+> **Page blanche après un déploiement ?** C'est presque toujours un `index.html`
+> mis en cache qui pointe vers des assets disparus. `nginx.conf` sert `index.html`
+> en `no-store` précisément pour l'éviter ; si le problème persiste, videz le
+> cache du navigateur et vérifiez qu'aucun proxy intermédiaire ne le remet.
 
 ## 4. Mise à jour
 
@@ -113,11 +140,21 @@ make deploy                   # git pull + check + up -d --build
 Le volume `tnfc-data` (bases SQLite) et les fichiers sur auditus survivent aux
 reconstructions.
 
-> **Migration à faire une fois** (arrivée de la carte des touches) : ajoutez
-> `KEYBINDS_DB_PATH=/data/keybinds.db` à votre `deploy/app.env` existant. Sans
-> cette ligne, la base des touches est créée **dans l'image** (`/app/data`) et
-> repart de zéro à chaque reconstruction. `make check` refuse de déployer tant
-> qu'elle manque.
+> **Migrations à faire une fois** sur un `deploy/app.env` existant — `make check`
+> refuse de déployer tant qu'elles manquent :
+>
+> - `KEYBINDS_DB_PATH=/data/keybinds.db` (carte des touches) ;
+> - `CONFIG_ENV_PATH=/data/app.env` (refactor backend/frontend). Sans cette ligne,
+>   la page Paramètres écrit **dans la couche d'image** et les chemins saisis
+>   depuis l'interface sont perdus à la reconstruction suivante.
+>
+> Dans les deux cas, le fichier est sinon créé dans l'image (`/app/data`) et repart
+> de zéro à chaque `--build`.
+
+> **Reconstruction complète requise** au passage à cette version : le service
+> `tnfc` est remplacé par `backend` + `frontend`. Faites `make down` puis
+> `make up` — `docker compose` ne supprime pas l'ancien conteneur tout seul si son
+> nom de service a disparu. Le volume `tnfc-data` est conservé.
 
 ---
 

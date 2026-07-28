@@ -100,3 +100,45 @@ def test_suggest_date_falls_back_to_default_on_empty_chapter(client):
 def test_suggest_date_rejects_unknown_category(client):
     response = client.get(f"{BASE}/calendar/suggest", params={"category": "nope"})
     assert response.status_code == 422
+
+
+# --- Lecture d'un fichier de métadonnées ----------------------------------------
+
+def test_metadata_file_content_is_returned(client, sandbox):
+    (sandbox["metadatas_dir"] / "combat.json").write_text(
+        '{"lieu": "Bordeciel", "emotion": "tension"}', encoding="utf-8"
+    )
+
+    body = client.get(f"{BASE}/metadata-files/combat.json").json()
+    assert body == {"lieu": "Bordeciel", "emotion": "tension"}
+
+
+def test_unknown_metadata_file_is_404(client):
+    assert client.get(f"{BASE}/metadata-files/absent.json").status_code == 404
+
+
+def test_metadata_file_name_cannot_escape_the_directory(client, sandbox):
+    """Le nom est validé par appartenance à la liste réelle, pas par filtrage.
+
+    Un chemin relatif ne correspond à aucune entrée listée : il sort en 404 sans
+    qu'aucune lecture hors du dossier ne soit tentée.
+    """
+    secret = sandbox["root"] / "secret.json"
+    secret.write_text('{"secret": true}', encoding="utf-8")
+
+    for attempt in ("../secret.json", "..%2Fsecret.json", "%2e%2e%2fsecret.json"):
+        response = client.get(f"{BASE}/metadata-files/{attempt}")
+        assert response.status_code == 404, attempt
+        assert "secret" not in response.text
+
+
+def test_invalid_json_metadata_is_422(client, sandbox):
+    (sandbox["metadatas_dir"] / "casse.json").write_text("{pas du json", encoding="utf-8")
+
+    assert client.get(f"{BASE}/metadata-files/casse.json").status_code == 422
+
+
+def test_non_object_metadata_is_422(client, sandbox):
+    (sandbox["metadatas_dir"] / "liste.json").write_text("[1, 2, 3]", encoding="utf-8")
+
+    assert client.get(f"{BASE}/metadata-files/liste.json").status_code == 422

@@ -1,13 +1,11 @@
-"""Point d'entrée ASGI — API JSON `/api/v1`, et l'UI HTMX tant qu'elle vit.
+"""Point d'entrée ASGI — API JSON `/api/v1`.
 
-Phase 1 du refactor backend/frontend : l'API est complète et l'ancienne interface
-HTMX continue de tourner sur la même application. Elle est montée via un drapeau
-(`legacy_ui`) précisément pour que son retrait, une fois la SPA React en place, soit
-une seule ligne à supprimer et non une chirurgie.
+Le backend ne sert plus aucune page : le frontend React est un service distinct,
+servi par nginx. Traefik route `/api` ici et tout le reste vers lui, sur le même
+host — donc en same-origin, ce qui évite toute configuration CORS.
 
-La documentation vit sous `/api/docs` : en production, Traefik route `/api` vers ce
-service et tout le reste vers le frontend, donc `/docs` à la racine appartiendrait
-à la SPA.
+La documentation vit sous `/api/docs` et non `/docs` : la racine appartient à la
+SPA.
 """
 
 from fastapi import FastAPI, Request
@@ -20,7 +18,7 @@ from backend.app.routers import context, injections, keybinds, settings
 API_PREFIX = "/api/v1"
 
 
-def create_app(*, legacy_ui: bool = True) -> FastAPI:
+def create_app() -> FastAPI:
     app = FastAPI(
         title="LorePlexum — TNFCDataInjector",
         description=(
@@ -64,11 +62,6 @@ def create_app(*, legacy_ui: bool = True) -> FastAPI:
             allow_methods=["*"],
             allow_headers=["*"],
         )
-
-    if legacy_ui:
-        from webapp.ui import mount_legacy_ui
-
-        mount_legacy_ui(app)
 
     return app
 

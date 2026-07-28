@@ -18,6 +18,35 @@ Catégories utilisées : **Ajouté**, **Modifié**, **Corrigé**, **Supprimé**,
   Première des trois phases d'une migration en *strangler* vers un backend et un
   frontend déployables séparément. L'application reste utilisable de bout en bout
   à chaque étape : l'interface HTMX existante n'a rien perdu.
+  - **Frontend React/TypeScript autonome** (`frontend/`) : Vite, React Router,
+    TanStack Query. Les cinq pages sont portées (Injecter, Historique, Détail,
+    Touches, Paramètres) et l'ancienne interface HTMX est supprimée.
+    - Le **client TypeScript est généré** depuis l'OpenAPI du backend
+      (`npm run generate:api`) : le contrat n'est écrit qu'une fois, côté Pydantic,
+      et une divergence devient une erreur de compilation plutôt qu'un bug à
+      l'exécution.
+    - Le **thème « grimoire » est porté tel quel** — mêmes variables, mêmes noms de
+      classes, même rendu. Le choix d'une feuille globale plutôt que de CSS Modules
+      est délibéré : ces classes sont déjà cloisonnées par convention de nommage.
+    - Les **filtres de l'historique vivent dans l'URL** : un historique filtré reste
+      partageable et le bouton « précédent » du navigateur fonctionne.
+    - La **carte des touches gagne un filtre par famille et une recherche** d'action
+      ou de mémo, instantanés — l'état complet arrive en un appel, là où l'ancienne
+      interface rechargeait le clavier au serveur à chaque édition.
+    - Le **sélecteur de date calcule tout localement**, bornes du mois comprises.
+  - **Déploiement séparé en deux conteneurs** derrière Traefik, sur le même host :
+    `PathPrefix(/api)` (priorité 100) vers le backend, catch-all (priorité 1) vers
+    le frontend. Le navigateur reste donc en **same-origin** — aucune configuration
+    CORS nulle part, en développement (proxy Vite) comme en production.
+    - `backend/Dockerfile` ne copie plus que `backend/` ; `frontend/Dockerfile` est
+      un build multi-étapes `node:22-alpine` → `nginx:alpine` (~75 Mo, sans runtime JS).
+    - `nginx.conf` : repli SPA sur `index.html` pour les routes profondes, assets
+      hashés en cache immuable, et `index.html` en `no-store` — un `index.html`
+      périmé pointant vers des assets disparus est la cause classique de la page
+      blanche après déploiement.
+    - `deploy/Makefile` : `make logs|shell|restart S=<service>` pour cibler un seul
+      conteneur ; `make check` rappelle que l'accès n'est pas authentifié.
+  - `run_web.ps1` devient `run_dev.ps1` et lance les deux serveurs.
   - **API JSON versionnée `/api/v1`**, documentée sur `/api/docs` (OpenAPI sur
     `/api/openapi.json`) : santé, catégories, arcs, métadonnées, calendrier,
     injections (création, historique paginé, détail, PDF), carte des touches,
@@ -82,12 +111,37 @@ Catégories utilisées : **Ajouté**, **Modifié**, **Corrigé**, **Supprimé**,
   persistant (`/data/app.env`) — `make check` le vérifie en pré-vol.
 - `PUT /api/v1/settings` n'écrit que les clés déclarées : une requête ne peut pas
   injecter une variable arbitraire dans le fichier de configuration.
+- **La validation et le chargement de la configuration lisaient deux fichiers
+  différents.** `EnvLoader` faisait un `load_dotenv()` sans argument, qui
+  redécouvre le `.env` du dépôt en remontant depuis le répertoire courant, pendant
+  que la validation jugeait `CONFIG_ENV_PATH`. `/health` pouvait donc répondre
+  « configuration valide » alors que l'injection échouait en `503` sur des chemins
+  venus d'ailleurs — et en production, les chemins saisis depuis la page Paramètres
+  n'auraient jamais été lus. `EnvLoader` reçoit désormais le chemin explicitement.
+- **Un champ de configuration laissé vide cassait l'injection suivante.** La page
+  Paramètres écrit une chaîne vide dans l'environnement pour un champ vide ;
+  `os.getenv("MAX_TOKENS_PER_ENTRY", 500)` renvoyait alors `""` et non son défaut,
+  et `int("")` levait **au milieu du pipeline**, après l'injection JSON en mémoire.
+  L'utilisateur voyait « erreur lors de l'injection dans le XML », sans rapport avec
+  la cause. Même correction pour `PDF_OUTPUT_PATH` et `PDF_EXPORT_FILE`.
+- `GET /api/v1/metadata-files/{filename}` valide le nom **par appartenance** à la
+  liste réelle du dossier plutôt que de le concaténer au chemin : un nom relatif ne
+  correspond à aucune entrée et sort en `404`, sans lecture hors du dossier.
 
 ### Supprimé
 - **L'interface en ligne de commande**, dépréciée depuis la 0.3.0 : `Main.py`,
   `src/LorePlexum.py`, `src/ShellPrinter.py`, `src/DataExtractor.py`,
   `run_tnfc.ps1`. Le pipeline reste identique, seul l'adaptateur console disparaît.
 - `webapp/settings.py`, remplacé par `backend/app/env_file.py`.
+- **L'interface HTMX** (`webapp/`) : gabarits Jinja2, feuille de style, HTMX
+  vendorisé et `keymap.js`, remplacés par le frontend React.
+
+### Sécurité
+- L'application n'a **aucune authentification applicative** — choix explicite pour
+  un outil mono-utilisateur. `PUT /api/v1/settings` écrivant des chemins du système
+  de fichiers, la restriction doit être posée au **niveau réseau** (allowlist IP
+  Traefik, VPN, Tailscale) avant toute exposition publique. `make check` et
+  `DEPLOYMENT.md` le rappellent explicitement.
 
 ### Ajouté
 - **Makefile de déploiement** (`deploy/Makefile`) : enveloppe les commandes de

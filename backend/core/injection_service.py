@@ -78,10 +78,15 @@ class InjectionService:
         """
         self.reporter = reporter or Reporter()
         self.paths = paths
-        self.pdf_output_path = pdf_output_path or os.getenv(
-            "PDF_OUTPUT_PATH", "output/Journal_Entries_By_Date.pdf"
+        # `or` en cascade plutôt que le défaut de `getenv` : la page Paramètres
+        # écrit une chaîne vide pour un champ laissé vide, que `getenv` renvoie
+        # telle quelle au lieu de son défaut.
+        self.pdf_output_path = (
+            pdf_output_path
+            or os.getenv("PDF_OUTPUT_PATH")
+            or "output/Journal_Entries_By_Date.pdf"
         )
-        self.pdf_export_file = pdf_export_file or os.getenv("PDF_EXPORT_FILE")
+        self.pdf_export_file = pdf_export_file or os.getenv("PDF_EXPORT_FILE") or None
         self.db = db
 
         self.json_injector = JSONInjector(paths['full_context_json_path'], self.reporter)

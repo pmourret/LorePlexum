@@ -1,5 +1,11 @@
-/* Thème "grimoire" — parchemin sombre, accents d'or. Aucune police externe :
-   on reste sur des familles système pour un fonctionnement 100 % hors-ligne. */
+/* Thème « grimoire » — parchemin sombre, accents d'or. Aucune police externe :
+   on reste sur des familles système pour un fonctionnement 100 % hors-ligne.
+
+   Porté tel quel depuis l'ancienne interface HTMX : mêmes variables, mêmes noms
+   de classes, même rendu. Le choix d'une feuille globale plutôt que de CSS
+   Modules est délibéré — ces classes sont déjà cloisonnées par convention de
+   nommage, et un découpage par composant n'aurait apporté qu'un risque de
+   dérive visuelle pour aucun gain. */
 :root {
     --bg: #14110d;
     --bg-2: #1d1913;
@@ -134,13 +140,19 @@ code { background: #100d09; padding: 1px 6px; border-radius: 5px; color: var(--g
 .log.info { color: var(--ink-soft); }
 .log-icon { flex: 0 0 auto; }
 
-/* --- Spinner HTMX --- */
+/* --- Indicateurs d'activité ---
+   Le spinner était piloté par les classes que HTMX posait sur le DOM ; il est
+   maintenant rendu conditionnellement par React. */
 .spinner { width: 14px; height: 14px; border: 2px solid rgba(0,0,0,.3); border-top-color: #1a1408;
     border-radius: 50%; display: inline-block; animation: spin .7s linear infinite; }
-.htmx-indicator { display: none; }
-.htmx-request .htmx-indicator { display: inline-block; }
-.htmx-request.htmx-indicator { display: inline-block; }
+.spinner.on-dark { border-color: rgba(232,223,206,.25); border-top-color: var(--gold-soft); }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+.loading { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; padding: 24px 0; }
+
+/* Rafraîchissement en arrière-plan : le contenu reste lisible et cliquable, il
+   signale juste qu'il n'est plus tout à fait à jour. */
+.stale { opacity: .55; transition: opacity .15s; }
 
 /* --- Filtres historique --- */
 .filters { display: flex; gap: 16px; align-items: end; flex-wrap: wrap; margin-bottom: 18px; }
@@ -182,7 +194,7 @@ code { background: #100d09; padding: 1px 6px; border-radius: 5px; color: var(--g
 
 /* --- Carte des touches --------------------------------------------------------
    Le châssis reste « grimoire » (cartes, or, serif). Les couleurs des keycaps,
-   elles, arrivent en variables inline depuis src/KeyboardLayout.py :
+   elles, arrivent en variables inline depuis backend/core/keyboard_layout.py :
    --ink (texte), --edge (contour + bordure basse), --face (fond), --u (largeur
    en unités de touche). Aucune famille n'est écrite ici : en ajouter une ne
    demande aucune retouche de cette feuille. */
@@ -300,3 +312,42 @@ code { background: #100d09; padding: 1px 6px; border-radius: 5px; color: var(--g
 @media (max-width: 620px) {
     .key-editor { right: 8px; left: 8px; bottom: 8px; width: auto; }
 }
+
+/* --- Ajouts de la SPA ----------------------------------------------------------
+   Ce que l'ancienne interface obtenait « gratuitement » du rechargement de page et
+   qu'il faut désormais rendre explicite. */
+
+/* Le bandeau de navigation est en <button>/<NavLink> et non en <a> nu. */
+.nav a, .nav button {
+    font-family: inherit; background: none; cursor: pointer;
+}
+
+/* Barre d'état de configuration, affichée sur toutes les pages quand l'app n'est
+   pas configurée : la SPA ne recharge plus, il faut un signal persistant. */
+.config-banner { margin: 0 auto; max-width: 1100px; padding: 0 24px; }
+.config-banner .alert { margin-top: 18px; }
+
+/* Recherche de l'historique : la saisie est débouncée, on le montre. */
+.filters .searching { color: var(--gold-soft); }
+
+/* Carte des touches : filtre par famille et recherche d'action, impossibles à
+   rendre agréables tant que chaque interaction repartait au serveur. */
+.keymap-toolbar {
+    display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center;
+    margin-bottom: 16px;
+}
+.keymap-toolbar .grow { flex: 1; min-width: 200px; }
+.keymap-toolbar label { margin: 0; }
+
+/* Touche estompée parce qu'elle ne correspond pas au filtre courant. */
+.keycap.dimmed { opacity: .18; }
+.keycap.hit { box-shadow: 0 0 0 2px var(--gold); }
+
+/* Pastille de famille cliquable dans la légende (filtre). */
+.legend-item.filterable { cursor: pointer; border-radius: 20px; padding: 2px 8px; margin: -2px -8px; }
+.legend-item.filterable:hover { background: rgba(201,162,75,.08); }
+.legend-item.active { background: rgba(201,162,75,.14); color: var(--ink); }
+
+/* Page introuvable. */
+.notfound { text-align: center; padding: 60px 20px; }
+.notfound h1 { margin-bottom: 8px; }

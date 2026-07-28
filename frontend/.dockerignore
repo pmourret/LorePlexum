@@ -1,0 +1,6 @@
+# Le build multi-étapes fait son propre `npm ci` : les modules de l'hôte ne
+# doivent jamais entrer dans le contexte (lents à transférer, et compilés pour
+# la mauvaise plateforme).
+node_modules/
+dist/
+openapi.json

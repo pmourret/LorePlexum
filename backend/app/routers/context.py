@@ -1,5 +1,7 @@
 """Données de contexte alimentant les formulaires : santé, catégories, arcs, calendrier."""
 
+import os
+
 from fastapi import APIRouter, HTTPException, Query
 
 from backend.app.deps import ConfigStatus, Service
@@ -52,6 +54,44 @@ def list_metadata_files(service: Service) -> list[str]:
         # Dossier absent, vide ou inaccessible : ce champ est facultatif, on ne
         # transforme pas ça en erreur d'API.
         return []
+
+
+@router.get("/metadata-files/{filename}", response_model=dict,
+            summary="Contenu d'un fichier de métadonnées",
+            responses={404: {"description": "Fichier inconnu"},
+                       422: {"description": "Fichier illisible ou JSON invalide"}})
+def read_metadata_file(filename: str, service: Service) -> dict:
+    """Renvoie le contenu JSON d'un fichier du dossier de métadonnées.
+
+    Le nom est **vérifié par appartenance** à la liste réelle du dossier, jamais
+    concaténé tel quel au chemin : une valeur comme `../../etc/passwd` ne
+    correspond à aucune entrée de la liste et sort en 404. C'est plus solide
+    qu'un filtrage de caractères, qui se contourne toujours.
+    """
+    metadatas_dir = service.paths.get("metadatas_dir")
+    if not metadatas_dir:
+        raise HTTPException(status_code=404, detail="Aucun dossier de métadonnées configuré.")
+
+    try:
+        available = FileChooser.list_files(metadatas_dir)
+    except (FileNotFoundError, OSError):
+        available = []
+    if filename not in available:
+        raise HTTPException(status_code=404, detail=f"Fichier de métadonnées inconnu : {filename}")
+
+    try:
+        content = service.json_injector.load_metadata_json(
+            os.path.join(metadatas_dir, filename)
+        )
+    except (ValueError, OSError) as exc:
+        raise HTTPException(status_code=422, detail=f"Métadonnées illisibles : {exc}") from exc
+
+    if not isinstance(content, dict):
+        raise HTTPException(
+            status_code=422,
+            detail="Les métadonnées doivent être un objet JSON.",
+        )
+    return content
 
 
 @router.get("/calendar", response_model=CalendarOut,

@@ -22,8 +22,16 @@ deploy/.env
 
 # Doc et scripts propres au poste Windows.
 run_web.ps1
+run_backend.ps1
+run_frontend.ps1
 *.md
 
 # Tests : pytest n'est pas installé dans l'image.
 /tests/
 requirements-dev.txt
+
+# Le frontend a son propre contexte de build (frontend/Dockerfile) : rien de
+# tout cela n'a sa place dans l'image du backend.
+/frontend/
+/samples/
+/scripts/

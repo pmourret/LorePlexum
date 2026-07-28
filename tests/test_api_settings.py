@@ -10,6 +10,8 @@ configuration » :
     persistant au lieu de la couche d'image.
 """
 
+import os
+
 BASE = "/api/v1"
 
 
@@ -87,3 +89,68 @@ def test_put_ignores_unknown_keys(client, sandbox):
     assert "SECRET_INJECTE" not in written
     keys = {c["key"] for c in client.get(f"{BASE}/settings").json()["checks"]}
     assert "SECRET_INJECTE" not in keys
+
+
+# --- Cohérence entre validation et chargement -----------------------------------
+
+def test_paths_written_through_the_api_are_actually_used(tmp_path, monkeypatch):
+    """Ce que la page Paramètres écrit doit être ce que le service charge.
+
+    Régression : `EnvLoader` faisait un `load_dotenv()` sans argument, qui
+    redécouvre le `.env` du dépôt en remontant depuis le répertoire courant. La
+    validation jugeait `CONFIG_ENV_PATH` pendant que le chargement lisait un autre
+    fichier — `/health` répondait « configuration valide » et l'injection échouait
+    en 503 sur des chemins venus d'ailleurs. En production, les chemins saisis
+    depuis l'interface n'auraient jamais été lus.
+    """
+    import shutil
+
+    from fastapi.testclient import TestClient
+
+    from backend.app.config import DeploymentSettings, get_deployment_settings
+    from backend.app.main import create_app
+    from tests.conftest import ENV_KEYS, SAMPLES_DIR
+
+    # Aucune variable d'environnement : tout doit venir du fichier de configuration.
+    for key in ENV_KEYS:
+        monkeypatch.delenv(key, raising=False)
+
+    exports = tmp_path / "exports"
+    entries = tmp_path / "entries"
+    exports.mkdir()
+    entries.mkdir()
+    for name in os.listdir(SAMPLES_DIR):
+        if name.endswith(".xml"):
+            shutil.copy2(os.path.join(SAMPLES_DIR, name), exports / name)
+    context = tmp_path / "full_context.json"
+    context.write_text('{"character_arc": {}}', encoding="utf-8")
+
+    config_env = tmp_path / "app.env"
+    config_env.write_text("", encoding="utf-8")
+
+    app = create_app()
+    app.dependency_overrides[get_deployment_settings] = lambda: DeploymentSettings(
+        database_path=str(tmp_path / "injections.db"),
+        keybinds_db_path=str(tmp_path / "keybinds.db"),
+        config_env_path=str(config_env),
+        dev_cors_origin="",
+    )
+
+    with TestClient(app) as client:
+        assert client.get(f"{BASE}/health").json()["config_ok"] is False
+
+        saved = client.put(f"{BASE}/settings", json={"values": {
+            "FULL_CONTEXT_JSON_PATH": str(context),
+            "ENTRIES_DIR": str(entries),
+            "TAKE_NOTES_EXPORT_DIR": str(exports),
+        }}).json()
+        assert saved["all_ok"] is True
+
+        # Et surtout : le service charge bien ces chemins-là.
+        assert client.get(f"{BASE}/health").json()["config_ok"] is True
+        response = client.post(f"{BASE}/injections", json={
+            "category": "quetes", "text": "Texte.", "generate_pdf": False,
+        })
+        assert response.status_code == 201, response.text
+
+    app.dependency_overrides.clear()

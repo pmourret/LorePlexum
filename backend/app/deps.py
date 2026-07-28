@@ -91,8 +91,10 @@ def get_service(
             "Configuration incomplète ou invalide — " + " ; ".join(problems)
         )
 
+    # Le MÊME fichier que celui que `validate_settings` vient de juger : sans quoi
+    # la validation et le chargement portent sur deux sources différentes.
     try:
-        env = EnvLoader()
+        env = EnvLoader(settings.config_env_path)
     except ValueError as exc:
         raise ConfigurationError(str(exc)) from exc
 

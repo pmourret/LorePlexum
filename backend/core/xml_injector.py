@@ -78,7 +78,18 @@ class XMLInjector:
 
         # Segmentation du texte sans couper les mots.
         if max_tokens is None:
-            max_tokens = int(os.getenv("MAX_TOKENS_PER_ENTRY", 500))
+            # `or 500` et non un défaut de `getenv` : la page Paramètres écrit une
+            # chaîne VIDE pour un champ laissé vide, et `getenv` la renvoie telle
+            # quelle plutôt que son défaut. `int("")` levait alors une exception au
+            # milieu du pipeline, après l'injection JSON en mémoire.
+            raw = os.getenv("MAX_TOKENS_PER_ENTRY") or 500
+            try:
+                max_tokens = int(raw)
+            except (TypeError, ValueError):
+                self.reporter.warning(
+                    f"MAX_TOKENS_PER_ENTRY invalide ({raw!r}) : repli sur 500."
+                )
+                max_tokens = 500
         segments = textwrap.wrap(
             input_text, width=max_tokens, break_long_words=False, replace_whitespace=False
         )

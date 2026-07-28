@@ -135,8 +135,8 @@ def service(sandbox, db, reporter) -> InjectionService:
 
 @pytest.fixture
 def client(settings) -> TestClient:
-    """Application API seule (sans l'UI HTMX), dépendances pointées sur le bac à sable."""
-    app = create_app(legacy_ui=False)
+    """Application configurée sur le bac à sable."""
+    app = create_app()
     app.dependency_overrides[get_deployment_settings] = lambda: settings
     with TestClient(app) as test_client:
         yield test_client
@@ -162,7 +162,7 @@ def unconfigured_client(tmp_path, monkeypatch) -> TestClient:
         dev_cors_origin="",
     )
 
-    app = create_app(legacy_ui=False)
+    app = create_app()
     app.dependency_overrides[get_deployment_settings] = lambda: settings
     with TestClient(app) as test_client:
         yield test_client

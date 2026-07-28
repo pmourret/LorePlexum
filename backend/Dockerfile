@@ -1,6 +1,11 @@
-# Image de l'application web TNFCDataInjector (FastAPI + WeasyPrint).
-# Cible : serveur Docker « hiatus », écrit sur le partage SMB « auditus » monté
-# dans le conteneur (voir docker-compose.yml).
+# Image du backend LorePlexum : API FastAPI + génération PDF WeasyPrint.
+#
+# Ne sert plus aucune page — le frontend React est un service distinct (voir
+# frontend/Dockerfile). Cible : serveur Docker « hiatus », écrit sur le partage
+# SMB « auditus » monté dans le conteneur (voir deploy/docker-compose.yml).
+#
+# Contexte de build attendu : la RACINE du dépôt, pour pouvoir copier
+# `backend/` et `requirements.txt` ensemble.
 FROM python:3.12-slim-bookworm
 
 ENV PYTHONUNBUFFERED=1 \
@@ -26,7 +31,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+# Seul le backend entre dans l'image : ni le frontend, ni les tests, ni les
+# scripts de développement.
+COPY backend/ ./backend/
 
 EXPOSE 8000
 

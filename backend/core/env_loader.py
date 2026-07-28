@@ -5,8 +5,23 @@ class EnvLoader:
     """
     Loads and validates environment variables required for file paths.
     """
-    def __init__(self):
-        load_dotenv()
+    def __init__(self, env_path=None):
+        """
+        :param env_path: fichier de configuration à charger. **À fournir** : c'est
+            le fichier que la page Paramètres écrit (``CONFIG_ENV_PATH``).
+
+            Sans lui, ``load_dotenv()`` redécouvre le ``.env`` du dépôt en
+            remontant depuis le répertoire courant, et la validation (qui lit
+            ``CONFIG_ENV_PATH``) se retrouve à juger un fichier que le chargement
+            n'utilise pas. Les deux divergent alors silencieusement : la page
+            Paramètres affiche « configuration valide » pendant que l'injection
+            échoue sur des chemins venus d'ailleurs.
+
+            ``override=False`` est conservé : une variable d'environnement
+            l'emporte sur le fichier, exactement comme dans
+            ``backend.app.env_file.effective_settings``.
+        """
+        load_dotenv(env_path) if env_path else load_dotenv()
         self.full_context_json_path = os.getenv('FULL_CONTEXT_JSON_PATH')
         self.entries_dir = os.getenv('ENTRIES_DIR')
         self.metadatas_dir = os.getenv('METADATAS_DIR')

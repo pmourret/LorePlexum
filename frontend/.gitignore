@@ -1,0 +1,6 @@
+node_modules/
+dist/
+# Cache incrémental de `tsc -b`.
+*.tsbuildinfo
+# Généré depuis le backend par `npm run generate:api`.
+openapi.json

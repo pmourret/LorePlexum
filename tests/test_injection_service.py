@@ -179,3 +179,29 @@ def test_suggest_entry_date_reads_last_known_date(service):
     # ExportChapter3.xml (quetes) est vide : aucune date à proposer.
     assert service.suggest_entry_date("quetes") == ""
     assert service.suggest_entry_date("inexistante") == ""
+
+
+# --- Tolérance aux champs vides de la page Paramètres ---------------------------
+
+def test_empty_max_tokens_env_falls_back_instead_of_crashing(service, monkeypatch):
+    """La page Paramètres écrit une chaîne vide pour un champ laissé vide.
+
+    `os.getenv("MAX_TOKENS_PER_ENTRY", 500)` renvoyait alors `""` et non le défaut,
+    et `int("")` levait au milieu du pipeline — après l'injection JSON en mémoire,
+    donc l'utilisateur voyait « erreur lors de l'injection dans le XML » sans
+    rapport avec la cause.
+    """
+    monkeypatch.setenv("MAX_TOKENS_PER_ENTRY", "")
+
+    result = service.run(make_request())
+
+    assert result.success
+
+
+def test_invalid_max_tokens_env_warns_and_falls_back(service, monkeypatch):
+    monkeypatch.setenv("MAX_TOKENS_PER_ENTRY", "beaucoup")
+
+    result = service.run(make_request())
+
+    assert result.success
+    assert any("MAX_TOKENS_PER_ENTRY" in m["message"] for m in result.messages)
