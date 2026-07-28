@@ -39,7 +39,8 @@ services:
       - traefik.enable=true
       - traefik.docker.network=proxy
       - traefik.http.routers.loreplexum.rule=Host(`${APP_HOST}`)
-      - traefik.http.routers.loreplexum.entrypoints=web
+      - traefik.http.routers.loreplexum.entrypoints=websecure
+      - traefik.http.routers.loreplexum.tls.certresolver=duckdns
       - traefik.http.services.loreplexum.loadbalancer.server.port=8000
 
 networks:
