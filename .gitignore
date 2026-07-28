@@ -16,6 +16,8 @@
 # --- Déploiement Docker : secrets réels ignorés, gabarits .example versionnés ---
 /deploy/.env
 /deploy/app.env
+# Archives produites par `make backup`.
+/deploy/backups/
 
 # --- IDE ---
 /.idea/

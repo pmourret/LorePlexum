@@ -14,6 +14,14 @@ Catégories utilisées : **Ajouté**, **Modifié**, **Corrigé**, **Supprimé**,
 ## [Non publié]
 
 ### Ajouté
+- **Makefile de déploiement** (`deploy/Makefile`) : enveloppe les commandes de
+  `DEPLOYMENT.md` (`make init` / `check` / `up` / `deploy` / `recreate` / `logs` /
+  `shell` / `backup`), sans ajouter d'étape — les `docker compose` restent
+  utilisables tels quels. `make check` est un **pré-vol** qui vérifie les
+  prérequis silencieux (montage CIFS `/mnt/TakeNotes`, réseau Traefik `proxy`,
+  variables obligatoires, bases pointant bien dans le volume `/data`) plutôt que
+  de les laisser échouer dans les logs au démarrage. `make backup` archive les
+  bases SQLite du volume dans `deploy/backups/` (ignoré par git).
 - **Carte des touches** (`src/KeyboardLayout.py`, `src/KeyBinds.py`, page
   `Touches`) : addon déclaratif qui affiche un clavier AZERTY, un pavé numérique
   et une souris, et permet de noter l'action associée à chaque touche ainsi qu'un
@@ -33,6 +41,9 @@ Catégories utilisées : **Ajouté**, **Modifié**, **Corrigé**, **Supprimé**,
     keycap en variables CSS inline, si bien qu'ajouter une famille ne demande
     aucune retouche de la feuille de style. Base amorcée au premier lancement avec
     le mapping Skyrim / Nolvus réel (27 touches), export JSON téléchargeable.
+  - **En production, ajoutez `KEYBINDS_DB_PATH=/data/keybinds.db` à
+    `deploy/app.env`** : sans cette ligne la base tombe sur son défaut relatif,
+    est créée dans l'image et repart du semis à chaque reconstruction.
 - **Calendrier tamrielien pour la date de session** (`src/TamrielicCalendar.py`) :
   le champ date libre est remplacé par des menus déroulants structurés (Mois, Jour,
   Ère, Année) reprenant les 12 mois du calendrier de *The Elder Scrolls*

@@ -28,7 +28,9 @@
       "Read(//d/Projects/Python/Loreplexus/Architecture/**)",
       "Bash(git -C \"d:/Projects/Python/Loreplexus\" log --oneline -10)",
       "Bash(.venv/Scripts/python.exe -c ' *)",
-      "Bash(.venv/Scripts/python.exe -m pytest -q)"
+      "Bash(.venv/Scripts/python.exe -m pytest -q)",
+      "Bash(awk '/^[a-z-]+:/{r=1;next} /^[^\\\\t]/{r=0} r&&/^ /{print NR\": \"$0}' Makefile)",
+      "Bash(awk 'BEGIN {FS = \":.*## \"}; {printf \"  %-10s %s\\\\n\", $1, $2}')"
     ]
   }
 }

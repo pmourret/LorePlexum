@@ -55,11 +55,14 @@ de jeu et avec l'app disponible en permanence.
 Depuis `deploy/` :
 
 ```bash
-cp .env.example .env          # une seule variable : APP_HOST (hôte Traefik)
-cp app.env.example app.env    # config appli (chemins Linux sous /mnt/TakeNotes)
+make init                     # copie les deux .example (n'écrase jamais l'existant)
 ```
 
-Éditez les deux fichiers. Ni `deploy/.env` ni `deploy/app.env` ne sont versionnés.
+Éditez les deux fichiers, puis `make check` pour valider. Ni `deploy/.env` ni
+`deploy/app.env` ne sont versionnés.
+
+> Sans `make`, l'équivalent manuel reste :
+> `cp .env.example .env && cp app.env.example app.env`
 
 - `deploy/.env` → `APP_HOST` uniquement (le montage CIFS est géré par l'hôte, pas
   par Docker, donc plus d'identifiants SMB ici).
@@ -70,9 +73,23 @@ cp app.env.example app.env    # config appli (chemins Linux sous /mnt/TakeNotes)
 
 ```bash
 cd deploy
-docker compose up -d --build
-docker compose logs -f        # vérifier le démarrage (validation des chemins .env)
+make check                    # pré-vol : montage, réseau proxy, variables
+make up                       # équivaut à docker compose up -d --build
+make logs                     # vérifier le démarrage (validation des chemins .env)
 ```
+
+`make` seul liste toutes les cibles. Les commandes `docker compose` restent
+utilisables directement : le Makefile ne fait que les envelopper, il n'introduit
+aucune étape supplémentaire.
+
+| Cible | Équivalent |
+|---|---|
+| `make up` | `docker compose up -d --build` (précédé de `make check`) |
+| `make deploy` | `git pull` puis `make up` — le flux de mise à jour nominal |
+| `make recreate` | `docker compose up -d --build --force-recreate` |
+| `make down` / `restart` / `logs` / `ps` | les `docker compose` correspondants |
+| `make shell` | `docker compose exec tnfc /bin/bash` |
+| `make backup` | archive les bases SQLite du volume dans `deploy/backups/` |
 
 L'interface est ensuite accessible via Traefik sur `https://<APP_HOST>/`
 (ex. `https://loreplexum.sternum-lab.duckdns.org/`), sans port à ouvrir sur l'hôte.
@@ -90,12 +107,17 @@ Traefik (résolveur `duckdns`, challenge DNS-01) : rien à faire côté applicat
 
 ```bash
 cd deploy
-git pull
-docker compose up -d --build
+make deploy                   # git pull + check + up -d --build
 ```
 
-Le volume `tnfc-data` (base SQLite) et les fichiers sur auditus survivent aux
+Le volume `tnfc-data` (bases SQLite) et les fichiers sur auditus survivent aux
 reconstructions.
+
+> **Migration à faire une fois** (arrivée de la carte des touches) : ajoutez
+> `KEYBINDS_DB_PATH=/data/keybinds.db` à votre `deploy/app.env` existant. Sans
+> cette ligne, la base des touches est créée **dans l'image** (`/app/data`) et
+> repart de zéro à chaque reconstruction. `make check` refuse de déployer tant
+> qu'elle manque.
 
 ---
 
