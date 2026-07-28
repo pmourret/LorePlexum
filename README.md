@@ -64,6 +64,8 @@ sert donc l'interface web et l'adaptateur CLI.
 | `src/EnvLoader.py` | Chargement / validation des variables d'environnement (`.env`). |
 | `src/DataExtractor.py` | Extraction des sections `Resume :` / `Text :` d'un texte brut (utilisé par le **CLI déprécié** ; le web fournit deux champs séparés). |
 | `src/TamrielicCalendar.py` | Calendrier de jeu (*The Elder Scrolls*) : mois, ères, jours ; formatage/parsing d'une date de session. |
+| `src/KeyboardLayout.py` | Données pures de la **carte des touches** : familles (libellé + couleurs), disposition AZERTY en scan codes DirectInput, souris, mapping de départ. Ajouter une famille se fait ici et nulle part ailleurs. |
+| `src/KeyBinds.py` (`KeyBindDatabase`) | Persistance SQLite de la carte des touches (`data/keybinds.db`). Le scan code est clé primaire : « une touche = une action » est garanti par le schéma. |
 | `src/JSONInjector.py` | Chargement, injection et sauvegarde du JSON de contexte. `list_arcs()` / `resolve_arc()`. |
 | `src/FissDocument.py` | **Couche pivot** du format XML FISS/TakeNotes : seule porte d'entrée/sortie du format brut. Lecture *tolérante* (casse, déclaration parasite), écriture *strictement native* (une ligne, pas de déclaration, échappement `&apos;`/`&#x0D;`…), comptage par scan séquentiel `Date{N}`/`entry{N}`, `.bak` avant écrasement, échec bruyant sur XML corrompu. |
 | `src/XMLInjector.py` | Injection du texte dans le XML TakeNotes (délègue tout le format à `FissDocument`). Date et segmentation en paramètres ; `get_last_date()`. |
@@ -74,7 +76,7 @@ sert donc l'interface web et l'adaptateur CLI.
 
 | Fichier | Responsabilité |
 |---|---|
-| `webapp/main.py` | Application FastAPI : routes `Injecter`, `Historique`, `Détail`, `Paramètres`. |
+| `webapp/main.py` | Application FastAPI : routes `Injecter`, `Historique`, `Détail`, `Touches`, `Paramètres`. |
 | `webapp/settings.py` | Lecture / écriture / validation du `.env` depuis la page Paramètres. |
 | `webapp/templates/` | Gabarits Jinja2 (HTMX pour l'interactivité sans rechargement). |
 | `webapp/static/` | Feuille de style (thème « grimoire ») et HTMX vendorisé (hors-ligne). |

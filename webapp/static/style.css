@@ -179,3 +179,124 @@ code { background: #100d09; padding: 1px 6px; border-radius: 5px; color: var(--g
 .status-badge.ok { color: var(--green); }
 .status-badge.error { color: var(--red); }
 .status-badge.empty { color: var(--muted); }
+
+/* --- Carte des touches --------------------------------------------------------
+   Le châssis reste « grimoire » (cartes, or, serif). Les couleurs des keycaps,
+   elles, arrivent en variables inline depuis src/KeyboardLayout.py :
+   --ink (texte), --edge (contour + bordure basse), --face (fond), --u (largeur
+   en unités de touche). Aucune famille n'est écrite ici : en ajouter une ne
+   demande aucune retouche de cette feuille. */
+:root {
+    --key-u: 46px;     /* largeur d'une touche « 1 unité » */
+    --key-gap: 5px;
+    --key-h: 50px;
+}
+
+.keys-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.keys-head h1 { margin-bottom: 0; }
+.keys-intro { max-width: 760px; margin: 10px 0 20px; font-size: 13px; }
+
+/* Le clavier a une largeur minimale : on le laisse défiler plutôt que le tasser. */
+.keymap-card { overflow-x: auto; }
+.keymap-board { display: flex; align-items: flex-start; gap: 26px; min-width: max-content; }
+.board-title {
+    font-size: 10px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 2px; margin-bottom: 8px; padding-left: 2px;
+}
+.numpad, .mouse { padding-top: 26px; }
+.key-row { display: flex; gap: var(--key-gap); margin-bottom: var(--key-gap); }
+.mouse .key-row { justify-content: stretch; }
+
+/* --- Keycap --- */
+.keycap {
+    /* Largeur = n unités + les gouttières internes qu'elle recouvre. */
+    flex: 0 0 calc(var(--u) * var(--key-u) + (var(--u) - 1) * var(--key-gap));
+    width: calc(var(--u) * var(--key-u) + (var(--u) - 1) * var(--key-gap));
+    height: var(--key-h);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 1px; padding: 3px 4px; overflow: hidden;
+    background: var(--face); color: var(--ink);
+    border: 1px solid var(--edge);
+    border-bottom: 3px solid var(--edge);   /* relief : la famille porte le socle */
+    border-radius: 6px;
+    cursor: pointer; text-align: center;
+    font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+    transition: filter .12s, box-shadow .12s;
+}
+.keycap:hover { filter: brightness(1.25); }
+.keycap:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(201,162,75,.45); }
+/* Enfoncement : la touche descend et son socle s'écrase. */
+.keycap:active { transform: translateY(1px); border-bottom-width: 2px; }
+.keycap.free { opacity: .75; }
+.keycap.bound { box-shadow: 0 1px 6px rgba(0,0,0,.4); }
+
+.cap-legend { font-size: 12px; line-height: 1.1; }
+.cap-action {
+    font-size: 8.5px; line-height: 1.15; opacity: .85;
+    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.keycap.bound .cap-legend { font-weight: 600; }
+
+/* --- Bandeau de légende --- */
+.legend {
+    display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center;
+    margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border);
+    font-size: 12px; color: var(--ink-soft);
+}
+.legend-item { display: inline-flex; align-items: center; gap: 7px; }
+.legend-chip {
+    width: 14px; height: 14px; border-radius: 4px;
+    background: var(--face); border: 1px solid var(--edge); border-bottom-width: 3px;
+}
+.legend-count {
+    background: var(--face); color: var(--ink);
+    border: 1px solid var(--edge); border-radius: 20px;
+    padding: 0 8px; font-size: 11px; font-family: ui-monospace, Consolas, monospace;
+}
+.legend-free { color: var(--muted); }
+
+/* --- Panneau d'édition ---
+   Flottant : la carte est haute, un panneau en flux passerait sous la ligne de
+   flottaison et le clic sur une touche semblerait sans effet. */
+.key-editor:empty { display: none; }
+.key-editor {
+    position: fixed; right: 26px; bottom: 26px; z-index: 20; width: 380px; max-width: calc(100vw - 32px);
+}
+.key-editor-panel {
+    background: linear-gradient(180deg, var(--panel), var(--bg-2));
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px 18px 18px; box-shadow: 0 10px 34px rgba(0,0,0,.55);
+}
+.editor-head { display: flex; align-items: center; gap: 12px; }
+.editor-cap {
+    flex: 0 0 auto; min-width: 44px; padding: 8px 10px; text-align: center;
+    background: var(--bg); border: 1px solid var(--border); border-bottom-width: 3px;
+    border-radius: 6px; color: var(--gold-soft);
+    font-family: ui-monospace, Consolas, monospace; font-size: 13px;
+}
+.editor-title { font-family: var(--serif); color: var(--gold-soft); font-size: 15px; letter-spacing: .5px; }
+/* Le scan code : présent pour qui le cherche, jamais encombrant. */
+.editor-code { font-size: 11px; color: var(--muted); }
+.editor-code code { font-size: 11px; }
+.editor-close { margin-left: auto; padding: 4px 9px; }
+
+/* --- Pastilles de famille --- */
+.pill-block { margin: 14px 0; }
+.pill-legend { display: block; font-size: 13px; color: var(--ink-soft); margin-bottom: 7px; }
+.pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.pill { position: relative; margin: 0; cursor: pointer; }
+.pill input { position: absolute; opacity: 0; width: 0; height: 0; }
+.pill span {
+    display: block; padding: 5px 12px; border-radius: 20px; font-size: 12px;
+    background: var(--bg); color: var(--muted);
+    border: 1px solid var(--border); transition: background .12s, color .12s;
+}
+.pill:hover span { color: var(--ink-soft); }
+.pill input:checked + span { background: var(--face); color: var(--ink); border-color: var(--edge); }
+.pill input:focus-visible + span { box-shadow: 0 0 0 2px rgba(201,162,75,.4); }
+
+.editor-actions { display: flex; gap: 10px; margin-top: 16px; }
+
+@media (max-width: 620px) {
+    .key-editor { right: 8px; left: 8px; bottom: 8px; width: auto; }
+}

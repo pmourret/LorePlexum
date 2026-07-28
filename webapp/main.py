@@ -11,16 +11,18 @@ import os
 import json
 
 from fastapi import FastAPI, Request, Form
-from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from src.Reporter import Reporter
 from src.Database import InjectionDatabase
+from src.KeyBinds import KeyBindDatabase
 from src.InjectionService import InjectionService, InjectionRequest, XML_FILES_MAPPING
 from src.EnvLoader import EnvLoader
 from src.FileChooser import FileChooser
 from src import TamrielicCalendar as calendar
+from src import KeyboardLayout as keyboard
 from webapp import settings as settings_module
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -31,6 +33,8 @@ templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
 # Base d'archivage partagée par toutes les requêtes (connexion ouverte par appel).
 db = InjectionDatabase()
+# Base de la carte des touches (indépendante de l'archivage narratif).
+keys_db = KeyBindDatabase()
 
 
 def build_service(reporter=None):
@@ -273,6 +277,88 @@ def download_pdf(injection_id: int):
     if item and item.get("pdf_path") and os.path.isfile(item["pdf_path"]):
         return FileResponse(item["pdf_path"], filename=os.path.basename(item["pdf_path"]))
     return HTMLResponse("PDF introuvable.", status_code=404)
+
+
+# --- Carte des touches ---------------------------------------------------------
+
+def _keymap_context(request, close_editor=False):
+    """Contexte complet du partiel `_keyboard.html` (clavier, souris, légende).
+
+    `close_editor` déclenche le swap hors-cible qui referme le panneau d'édition
+    après une écriture : la réponse a déjà #keymap pour cible principale.
+    """
+    binds = keys_db.all_binds()
+    return {
+        "request": request,
+        "rows": keyboard.ROWS,
+        "numpad": keyboard.NUMPAD,
+        "mouse_buttons": keyboard.MOUSE_BUTTONS,
+        "mouse_side": keyboard.MOUSE_SIDE,
+        "categories": keyboard.CATEGORIES,
+        "free_key": keyboard.FREE_KEY,
+        "palette": keyboard.palette,
+        "binds": binds,
+        "counts": keys_db.count_by_category(),
+        # Touches déclarées dans la disposition et restées sans action.
+        "free_count": sum(1 for k in keyboard.all_keys() if k["code"] not in binds),
+        "close_editor": close_editor,
+    }
+
+
+@app.get("/keys", response_class=HTMLResponse)
+def keys_page(request: Request):
+    return templates.TemplateResponse("keys.html", {
+        **_keymap_context(request), "active": "keys",
+    })
+
+
+@app.get("/keys/export")
+def keys_export():
+    """Télécharge la carte complète en JSON (sauvegarde / partage)."""
+    return JSONResponse(
+        keys_db.export_payload(),
+        headers={"Content-Disposition": 'attachment; filename="carte-des-touches.json"'},
+    )
+
+
+@app.get("/keys/{code}/edit", response_class=HTMLResponse)
+def key_editor(request: Request, code: int):
+    """Panneau d'édition d'une touche (fragment HTMX)."""
+    return templates.TemplateResponse("_key_editor.html", {
+        "request": request,
+        "code": code,
+        "legend": keyboard.legend_of(code),
+        "bind": keys_db.get_bind(code),
+        "categories": keyboard.CATEGORIES,
+        # Famille pré-cochée pour une touche libre : la première déclarée.
+        "default_cat": next(iter(keyboard.CATEGORIES)),
+    })
+
+
+@app.post("/keys/{code}", response_class=HTMLResponse)
+def key_save(request: Request, code: int,
+             action: str = Form(""), cat: str = Form(""), note: str = Form("")):
+    """Assigne une touche, puis renvoie la carte à jour.
+
+    Une action vide vaut libération : c'est le geste naturel quand on efface le
+    champ. Une famille inconnue est ignorée plutôt qu'écrite en base.
+    """
+    if not action.strip():
+        keys_db.clear_bind(code)
+    elif cat in keyboard.CATEGORIES:
+        keys_db.set_bind(code, action, cat, note)
+    return templates.TemplateResponse(
+        "_keyboard.html", _keymap_context(request, close_editor=True)
+    )
+
+
+@app.post("/keys/{code}/clear", response_class=HTMLResponse)
+def key_clear(request: Request, code: int):
+    """Libère une touche, puis renvoie la carte à jour."""
+    keys_db.clear_bind(code)
+    return templates.TemplateResponse(
+        "_keyboard.html", _keymap_context(request, close_editor=True)
+    )
 
 
 # --- Paramètres ----------------------------------------------------------------

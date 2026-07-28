@@ -14,6 +14,25 @@ Catégories utilisées : **Ajouté**, **Modifié**, **Corrigé**, **Supprimé**,
 ## [Non publié]
 
 ### Ajouté
+- **Carte des touches** (`src/KeyboardLayout.py`, `src/KeyBinds.py`, page
+  `Touches`) : addon déclaratif qui affiche un clavier AZERTY, un pavé numérique
+  et une souris, et permet de noter l'action associée à chaque touche ainsi qu'un
+  **mémo indiquant où elle se modifie** (MCM, `.ini`, `.json`) — l'information
+  qu'on ne retrouve plus six mois plus tard. Purement documentaire : aucun fichier
+  de jeu n'est lu ni écrit, aucun remappage, aucune capture clavier (l'assignation
+  se fait au clic sur la touche affichée).
+  - Les touches sont identifiées par leur **scan code DirectInput**, qui est aussi
+    la clé primaire de la table : la règle « une touche = une action » est portée
+    par le schéma, un conflit d'assignation est impossible par construction.
+  - La disposition est **positionnelle** (base clavier US) : la touche A française
+    porte le code 16, Z porte 17. C'est la confusion que le module neutralise, les
+    mods lisant le code et jamais la lettre imprimée. Même logique pour les boutons
+    latéraux de souris, libellés « Latéral haut / bas » plutôt que « M4 / M5 ».
+  - Les familles (Déplacement, Vanilla, Combat, iEquip, Survie, Interface) vivent
+    dans `KeyboardLayout.CATEGORIES` avec leurs couleurs ; celles-ci remontent au
+    keycap en variables CSS inline, si bien qu'ajouter une famille ne demande
+    aucune retouche de la feuille de style. Base amorcée au premier lancement avec
+    le mapping Skyrim / Nolvus réel (27 touches), export JSON téléchargeable.
 - **Calendrier tamrielien pour la date de session** (`src/TamrielicCalendar.py`) :
   le champ date libre est remplacé par des menus déroulants structurés (Mois, Jour,
   Ère, Année) reprenant les 12 mois du calendrier de *The Elder Scrolls*
