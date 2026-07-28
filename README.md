@@ -6,9 +6,10 @@ de contexte narratif complet et dans le fichier XML d'export TakeNotes de la
 catégorie choisie, génère un PDF récapitulatif du journal, et **archive chaque
 injection en base de données** (historique cherchable, détection des doublons).
 
-> Depuis la version 0.3.0, l'outil s'utilise via une **interface web** (FastAPI +
-> HTMX). L'ancienne interface en ligne de commande est conservée mais **dépréciée**
-> (voir [Interface en ligne de commande (dépréciée)](#interface-en-ligne-de-commande-dépréciée)).
+> L'outil se compose d'un **backend FastAPI** exposant une API JSON documentée sur
+> `/api/docs`, et d'un **frontend React/TypeScript**, déployés en deux conteneurs
+> derrière Traefik. L'ancienne interface HTMX et l'ancienne interface en ligne de
+> commande ont été **supprimées**.
 
 ---
 
@@ -24,7 +25,7 @@ injection en base de données** (historique cherchable, détection des doublons)
 - [Format des fichiers d'entrée](#format-des-fichiers-dentrée)
 - [Catégories et fichiers XML](#catégories-et-fichiers-xml)
 - [Sorties générées](#sorties-générées)
-- [Interface en ligne de commande (dépréciée)](#interface-en-ligne-de-commande-dépréciée)
+- [Développement et tests](#développement-et-tests)
 - [Dépannage](#dépannage)
 
 ---
@@ -49,45 +50,114 @@ injection en base de données** (historique cherchable, détection des doublons)
 
 ## Architecture
 
-Le cœur métier est **découplé de toute interface** : il ne lit jamais le clavier et
-n'imprime jamais dans un terminal. Toutes les décisions (catégorie, arc, date…)
-sont des paramètres, et les messages sont *rapportés* à un `Reporter`. Le même cœur
-sert donc l'interface web et l'adaptateur CLI.
+Le projet est découpé en **trois couches**, dans un dépôt unique :
 
-### Cœur métier (`src/`)
+```
+backend/core/   cœur métier — ne lit jamais le clavier, n'imprime jamais dans un terminal
+backend/app/    couche HTTP — API JSON /api/v1, schémas Pydantic, dépendances
+frontend/       SPA React/TypeScript — le seul consommateur de l'API aujourd'hui
+```
 
-| Fichier | Responsabilité |
-|---|---|
-| `src/InjectionService.py` | **Orchestrateur** du pipeline. Reçoit un `InjectionRequest`, renvoie un `InjectionResult` (succès, logs, n° d'entrée, PDF, doublon). Point d'entrée unique du web et du CLI. |
-| `src/Reporter.py` | Collecte les messages `(niveau, texte)` du pipeline (écho console optionnel). Remplace `ShellPrinter` dans le métier. |
-| `src/Database.py` (`InjectionDatabase`) | Archivage SQLite des injections + détection de doublons (empreinte SHA-256). |
-| `src/EnvLoader.py` | Chargement / validation des variables d'environnement (`.env`). |
-| `src/DataExtractor.py` | Extraction des sections `Resume :` / `Text :` d'un texte brut (utilisé par le **CLI déprécié** ; le web fournit deux champs séparés). |
-| `src/TamrielicCalendar.py` | Calendrier de jeu (*The Elder Scrolls*) : mois, ères, jours ; formatage/parsing d'une date de session. |
-| `src/KeyboardLayout.py` | Données pures de la **carte des touches** : familles (libellé + couleurs), disposition AZERTY en scan codes DirectInput, souris, mapping de départ. Ajouter une famille se fait ici et nulle part ailleurs. |
-| `src/KeyBinds.py` (`KeyBindDatabase`) | Persistance SQLite de la carte des touches (`data/keybinds.db`). Le scan code est clé primaire : « une touche = une action » est garanti par le schéma. |
-| `src/JSONInjector.py` | Chargement, injection et sauvegarde du JSON de contexte. `list_arcs()` / `resolve_arc()`. |
-| `src/FissDocument.py` | **Couche pivot** du format XML FISS/TakeNotes : seule porte d'entrée/sortie du format brut. Lecture *tolérante* (casse, déclaration parasite), écriture *strictement native* (une ligne, pas de déclaration, échappement `&apos;`/`&#x0D;`…), comptage par scan séquentiel `Date{N}`/`entry{N}`, `.bak` avant écrasement, échec bruyant sur XML corrompu. |
-| `src/XMLInjector.py` | Injection du texte dans le XML TakeNotes (délègue tout le format à `FissDocument`). Date et segmentation en paramètres ; `get_last_date()`. |
-| `src/PDFExtractor.py` (`PDFGenerator`) | Génère un PDF récapitulatif à partir du XML. |
-| `src/FileChooser.py` | Utilitaire `list_files()` (listing d'un dossier). |
+Toutes les décisions (catégorie, arc, date…) sont des **paramètres**, et les messages
+sont *rapportés* à un `Reporter` plutôt qu'imprimés. Le cœur ignore donc totalement
+d'où viennent les données.
 
-### Interface web (`webapp/`)
+Le backend ne sert **aucune page** et le frontend ne connaît **aucun chemin de
+fichier** : leur seul contact est le contrat d'API, dont le client TypeScript est
+généré (voir [Développement et tests](#développement-et-tests)).
+
+### Cœur métier (`backend/core/`)
 
 | Fichier | Responsabilité |
 |---|---|
-| `webapp/main.py` | Application FastAPI : routes `Injecter`, `Historique`, `Détail`, `Touches`, `Paramètres`. |
-| `webapp/settings.py` | Lecture / écriture / validation du `.env` depuis la page Paramètres. |
-| `webapp/templates/` | Gabarits Jinja2 (HTMX pour l'interactivité sans rechargement). |
-| `webapp/static/` | Feuille de style (thème « grimoire ») et HTMX vendorisé (hors-ligne). |
+| `injection_service.py` | **Orchestrateur** du pipeline. Reçoit un `InjectionRequest`, renvoie un `InjectionResult` (succès, logs, n° d'entrée, PDF, doublon). Point d'entrée unique de toutes les interfaces. |
+| `reporter.py` | Collecte les messages `(niveau, texte)` du pipeline (écho console optionnel). |
+| `database.py` (`InjectionDatabase`) | Archivage SQLite des injections + détection de doublons (empreinte SHA-256). |
+| `env_loader.py` | Chargement / validation des chemins applicatifs depuis l'environnement. |
+| `tamrielic_calendar.py` | Calendrier de jeu (*The Elder Scrolls*) : mois, ères, jours ; formatage/parsing d'une date de session. |
+| `keyboard_layout.py` | Données pures de la **carte des touches** : familles (libellé + couleurs), disposition AZERTY en scan codes DirectInput, souris, mapping de départ. Ajouter une famille se fait ici et nulle part ailleurs. |
+| `keybinds.py` (`KeyBindDatabase`) | Persistance SQLite de la carte des touches (`data/keybinds.db`). Le scan code est clé primaire : « une touche = une action » est garanti par le schéma. |
+| `json_injector.py` | Chargement, injection et sauvegarde du JSON de contexte. `list_arcs()` / `resolve_arc()`. |
+| `fiss_document.py` | **Couche pivot** du format XML FISS/TakeNotes : seule porte d'entrée/sortie du format brut. Lecture *tolérante* (casse, déclaration parasite), écriture *strictement native* (une ligne, pas de déclaration, échappement `&apos;`/`&#x0D;`…), comptage par scan séquentiel `Date{N}`/`entry{N}`, `.bak` avant écrasement, échec bruyant sur XML corrompu. |
+| `xml_injector.py` | Injection du texte dans le XML TakeNotes (délègue tout le format à `fiss_document`). Date et segmentation en paramètres ; `get_last_date()`. |
+| `pdf_extractor.py` (`PDFGenerator`) | Génère un PDF récapitulatif à partir du XML. |
+| `files.py` | Utilitaire `list_files()` (listing d'un dossier). |
 
-### Interface en ligne de commande (dépréciée)
+### Couche HTTP (`backend/app/`)
 
 | Fichier | Responsabilité |
 |---|---|
-| `Main.py` | Point d'entrée CLI (boucle d'exécution). |
-| `src/LorePlexum.py` (`TNFCDataInjector`) | Adaptateur CLI : collecte les saisies console puis délègue à `InjectionService`. |
-| `src/ShellPrinter.py` | Affichage coloré / emoji dans le terminal (utilisé par le CLI uniquement). |
+| `main.py` | `create_app()` : monte les routers sous `/api/v1` et traduit `ConfigurationError` en `503`. Point d'entrée ASGI. |
+| `config.py` | `DeploymentSettings` : réglages fixés au démarrage (bases SQLite, `CONFIG_ENV_PATH`). |
+| `env_file.py` | Lecture / écriture / validation de la configuration applicative éditable. |
+| `deps.py` | Providers `Depends` (bases, reporter, service) et `ConfigurationError`. |
+| `schemas/` | Modèles Pydantic — **la** source du contrat d'API, dont est généré le client TypeScript. |
+| `routers/` | `context` (santé, catégories, arcs, calendrier), `injections`, `keybinds`, `settings`. |
+
+L'API est documentée en ligne sur **`/api/docs`** (OpenAPI sur `/api/openapi.json`).
+
+| Méthode | Route | Rôle |
+|---|---|---|
+| `GET` | `/api/v1/health` | Santé + validité de la configuration |
+| `GET` | `/api/v1/categories` | Catégories et fichiers XML visés |
+| `GET` | `/api/v1/arcs` | Arcs existants dans le JSON de contexte |
+| `GET` | `/api/v1/metadata-files` | Fichiers de métadonnées disponibles |
+| `GET` | `/api/v1/calendar` | Calendrier tamrielien complet (statique) |
+| `GET` | `/api/v1/calendar/suggest` | Dernière date connue d'une catégorie |
+| `POST` | `/api/v1/injections` | Lance le pipeline → `201` / `409` doublon / `503` config |
+| `GET` | `/api/v1/injections` | Historique paginé et filtrable |
+| `GET` | `/api/v1/injections/facets` | Valeurs disponibles pour les filtres |
+| `GET` | `/api/v1/injections/{id}` | Détail d'une injection |
+| `GET` | `/api/v1/injections/{id}/pdf` | Téléchargement du PDF archivé |
+| `GET` | `/api/v1/keymap` | État complet de la carte des touches |
+| `PUT` `DELETE` | `/api/v1/keybinds/{scan_code}` | Assigne / libère une touche |
+| `GET` | `/api/v1/keybinds/export` | Export JSON de la carte |
+| `GET` `PUT` | `/api/v1/settings` | Configuration et validation |
+
+Un doublon se signale par un **`409`** portant le corps complet (journal d'exécution
++ injection existante) ; on force l'injection en rejouant le `POST` avec
+`allow_duplicate: true`. Une configuration invalide donne un **`503`** et non un
+`500` : le service va bien, c'est son environnement qui ne va pas.
+
+### Frontend (`frontend/`)
+
+| Fichier | Responsabilité |
+|---|---|
+| `src/api/schema.d.ts` | Types **générés** depuis l'OpenAPI du backend. Jamais édité à la main. |
+| `src/api/client.ts` | Enveloppe `fetch` typée + `ApiError` (qui distingue `409` doublon et `503` config). |
+| `src/api/hooks.ts` | Hooks TanStack Query et clés de cache, regroupés pour que l'invalidation reste ciblée. |
+| `src/pages/` | `InjectPage`, `HistoryPage`, `DetailPage`, `KeysPage`, `SettingsPage`. |
+| `src/components/` | `Layout` (bandeau + alerte de configuration), `DateField`, composants partagés. |
+| `src/styles/theme.css` | Thème « grimoire », porté tel quel depuis l'ancienne interface. |
+| `nginx.conf` | Service des statiques : repli SPA, `index.html` en `no-store`, assets immuables. |
+
+Deux points de conception valent d'être notés, parce qu'ils tirent parti de l'API
+et n'étaient pas faisables avant :
+
+- **Le calendrier est chargé une fois** (`GET /api/v1/calendar`) et le sélecteur de
+  date calcule tout localement — bornes du mois comprises. Les deux allers-retours
+  HTMX `/suggest-date` et `/date-days` ont disparu.
+- **La carte des touches tient dans un seul appel** (`GET /api/v1/keymap`), ce qui
+  rend possibles le filtre par famille et la recherche d'action : l'ancienne
+  interface rechargeait le clavier entier au serveur à chaque édition.
+
+### Déploiement
+
+Deux conteneurs derrière Traefik, sur le **même host**, départagés par le chemin
+via la priorité des routers :
+
+| Chemin | Service | Image |
+|---|---|---|
+| `/api/…` | `backend` | `python:3.12-slim` + WeasyPrint. Seul à monter le partage et les bases. |
+| tout le reste | `frontend` | build `node:22-alpine` → `nginx:alpine`. Aucun volume, aucune variable. |
+
+Le navigateur reste donc toujours en **same-origin** : aucune configuration CORS
+nulle part, en développement (proxy Vite) comme en production. Voir
+[deploy/DEPLOYMENT.md](deploy/DEPLOYMENT.md).
+
+> ⚠️ **Aucune authentification applicative.** `PUT /api/v1/settings` écrit des
+> chemins du système de fichiers : l'accès doit être restreint au niveau réseau
+> (allowlist IP Traefik, VPN, Tailscale) avant toute exposition publique.
 
 ---
 
@@ -118,13 +188,17 @@ pip install -r requirements.txt
 
 Dépendances Python (voir `requirements.txt`) :
 
-- `fastapi`, `uvicorn`, `jinja2`, `python-multipart` — interface web
+- `fastapi`, `uvicorn`, `jinja2`, `python-multipart` — couche web
+- `pydantic-settings` — réglages de déploiement typés
 - `weasyprint` — génération PDF (libs système Pango/Cairo, cf. [Prérequis](#prérequis))
-- `python-dotenv` — chargement du `.env`
-- `colorama`, `emoji`, `pyperclip` — utilisés par l'adaptateur CLI déprécié
+- `python-dotenv` — chargement de la configuration
+- `colorama` — écho console optionnel du `Reporter`
 
-HTMX est **vendorisé** dans `webapp/static/htmx.min.js` : aucune connexion Internet
-n'est requise pour utiliser l'interface.
+Les dépendances de test (`pytest`, `httpx`) vivent dans `requirements-dev.txt` et
+ne sont pas installées dans l'image de production.
+
+Le frontend se construit avec Node 22 (`cd frontend && npm ci`). Aucune ressource
+n'est chargée depuis Internet à l'exécution : polices système, pas de CDN.
 
 ### Déploiement conteneurisé (Docker)
 
@@ -170,17 +244,23 @@ PDF_EXPORT_FILE=ENTRIES
 ## Utilisation (interface web)
 
 ```powershell
-.\run_web.ps1
+.\run_dev.ps1
 ```
 
-Le script active le venv, démarre le serveur et ouvre le navigateur sur
-<http://127.0.0.1:8000/>. Alternativement :
+Le script lance les **deux** serveurs — backend Uvicorn sur `:8000`, frontend Vite
+sur `:5173` — et ouvre le navigateur sur <http://localhost:5173/>. Le proxy Vite
+renvoie `/api` vers le backend, donc le navigateur reste en same-origin comme en
+production. Alternativement, dans deux terminaux :
 
 ```powershell
-python -m uvicorn webapp.main:app --host 127.0.0.1 --port 8000
+python -m uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
+cd frontend ; npm run dev
 ```
 
-L'interface comporte trois pages :
+`.\run_dev.ps1 -Backend` ne lance que l'API et ouvre `/api/docs` : pratique pour
+explorer le contrat sans passer par l'interface.
+
+L'interface comporte quatre pages :
 
 ### 1. Injecter
 
@@ -208,10 +288,30 @@ Tableau de toutes les injections archivées, **filtrable en direct** par catégo
 arc et recherche plein-texte (résumé / texte), avec pagination. Chaque ligne ouvre
 une **page de détail** (texte injecté complet, métadonnées, lien PDF).
 
-### 3. Paramètres
+Les filtres vivent dans l'URL (`?categorie=&arc=&search=&page=`) : un historique
+filtré reste partageable et le bouton « précédent » du navigateur fait ce qu'on
+attend.
 
-Édition du `.env` avec validation en direct : chaque chemin obligatoire est marqué
-✅ (existe) ou ❌ (introuvable), en remplacement de l'édition manuelle du fichier.
+### 3. Touches
+
+Mémo de l'assignation Skyrim / Nolvus : clavier AZERTY, pavé numérique et souris.
+Un clic sur une touche ouvre l'éditeur (action, famille, mémo). Le **mémo** répond
+à « où se modifie cette touche ? » (MCM, `.ini`, `.json`) — l'information qu'on ne
+retrouve plus six mois après.
+
+Filtre par famille (clic sur la légende) et recherche d'action ou de mémo, tous
+deux instantanés : l'état complet de la carte arrive en un seul appel. Purement
+documentaire, aucun fichier de jeu n'est lu ni écrit.
+
+### 4. Paramètres
+
+Édition de la configuration avec validation en direct : chaque chemin obligatoire
+est marqué ✅ (existe) ou ❌ (introuvable), en remplacement de l'édition manuelle
+du fichier.
+
+La validation porte sur la configuration **effective** — variables d'environnement
+puis fichier, dans l'ordre de priorité réellement appliqué. Une valeur fournie par
+l'environnement (le cas en conteneur) apparaît donc bien comme valide.
 
 ---
 
@@ -286,7 +386,7 @@ longs sont découpés en segments (`MAX_TOKENS_PER_ENTRY`) sans couper les mots.
 
 Le format XML brut du mod TakeNotes/FISS n'a **aucun schéma officiel**. Son analyse
 sur des exports réels (`samples/`) a révélé des pièges que la couche pivot
-`src/FissDocument.py` neutralise — **à ne jamais réintroduire ailleurs** :
+`backend/core/fiss_document.py` neutralise — **à ne jamais réintroduire ailleurs** :
 
 - **`<NumberOfEntries>` n'est PAS le nombre d'entrées.** C'est l'**index de la
   prochaine entrée à écrire** (= nombre réel **+ 1**), jamais décrémenté quand une
@@ -325,22 +425,43 @@ plusieurs entrées, le round-trip natif octet-pour-octet et le recalcul de
 
 ---
 
-## Interface en ligne de commande (dépréciée)
-
-L'ancienne interface interactive reste fonctionnelle mais **est dépréciée** au
-profit de l'interface web ; elle sera retirée dans une version ultérieure.
+## Développement et tests
 
 ```powershell
-python Main.py
-# ou
-.\run_tnfc.ps1
+python -m pip install -r requirements.txt -r requirements-dev.txt
+python -m pytest tests/ -q
 ```
 
-Elle guide l'utilisateur par une série de questions dans le terminal (catégorie,
-source du texte — presse-papiers ou fichier —, arc, métadonnées, date), puis
-exécute exactement le même pipeline que le web (via `InjectionService`). Le CLI gère
-en plus l'archivage sur disque des fichiers traités (sous-dossiers `_traités/`), qui
-n'a pas d'équivalent côté web.
+| Fichier | Couvre |
+|---|---|
+| `tests/test_fiss_document.py` | La couche pivot du format XML FISS (lecture tolérante, écriture native, comptage). |
+| `tests/test_xml_injector.py` | L'injection XML au-dessus de la couche pivot (segmentation, TODO, `.bak`). |
+| `tests/test_injection_service.py` | L'orchestrateur et ses invariants — dont **le JSON n'est jamais écrit si le XML échoue**. |
+| `tests/test_api_*.py` | Le contrat HTTP : codes de statut, forme des corps, `409` doublon, `503` config, traversée de chemin. |
+
+Les fixtures (`tests/conftest.py`) montent un environnement applicatif jetable par
+test : copies des exports de `samples/`, JSON de contexte neuf, bases SQLite vierges.
+Aucune donnée réelle du projet n'est touchée.
+
+### Frontend
+
+```powershell
+cd frontend
+npm ci
+npm run generate:api     # regenere src/api/schema.d.ts depuis l'OpenAPI du backend
+npm run typecheck
+npm run build
+```
+
+**`npm run generate:api` est à relancer dès qu'un schéma Pydantic change.** Le
+contrat n'est écrit qu'une fois, côté backend ; une divergence se manifeste alors
+en erreur de compilation TypeScript plutôt qu'en bug à l'exécution.
+
+> `npm audit` signale un avis sur `react-router` en mode **RSC** (React Server
+> Components). Cette application est une SPA statique servie par nginx : ni SSR,
+> ni server actions, donc le code concerné n'est jamais exécuté. Rester sur la
+> version épinglée est délibéré — la version « corrigée » proposée (7.11.0)
+> réintroduit un *open redirect* dans `<Link>`, lui bien atteignable côté client.
 
 ---
 

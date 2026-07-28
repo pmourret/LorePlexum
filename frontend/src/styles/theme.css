@@ -1,0 +1,353 @@
+/* Thème « grimoire » — parchemin sombre, accents d'or. Aucune police externe :
+   on reste sur des familles système pour un fonctionnement 100 % hors-ligne.
+
+   Porté tel quel depuis l'ancienne interface HTMX : mêmes variables, mêmes noms
+   de classes, même rendu. Le choix d'une feuille globale plutôt que de CSS
+   Modules est délibéré — ces classes sont déjà cloisonnées par convention de
+   nommage, et un découpage par composant n'aurait apporté qu'un risque de
+   dérive visuelle pour aucun gain. */
+:root {
+    --bg: #14110d;
+    --bg-2: #1d1913;
+    --panel: #221d16;
+    --panel-2: #2a241b;
+    --border: #3a3225;
+    --ink: #e8dfce;
+    --ink-soft: #b6ab93;
+    --muted: #8a8069;
+    --gold: #c9a24b;
+    --gold-soft: #d9be7e;
+    --green: #7fae6b;
+    --red: #cf6a5a;
+    --amber: #d7a24a;
+    --blue: #6f9bc0;
+    --radius: 10px;
+    --serif: Georgia, "Times New Roman", serif;
+    --sans: "Segoe UI", system-ui, -apple-system, sans-serif;
+    /* Contrôles natifs (flèches des champs nombre, popups des <select>) rendus en
+       sombre pour rester cohérents avec le thème « grimoire ». */
+    color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    font-family: var(--sans);
+    color: var(--ink);
+    background:
+        radial-gradient(1200px 600px at 50% -200px, #2a2214 0%, transparent 60%),
+        var(--bg);
+    line-height: 1.55;
+}
+
+/* --- En-tête --- */
+.topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 28px;
+    background: linear-gradient(180deg, var(--bg-2), var(--bg));
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 10;
+}
+.brand { display: flex; align-items: center; gap: 12px; }
+.sigil { font-size: 30px; filter: drop-shadow(0 0 6px rgba(201,162,75,.4)); }
+.brand-title { font-family: var(--serif); font-size: 20px; color: var(--gold-soft); letter-spacing: .3px; }
+.brand-sub { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 2px; }
+.nav { display: flex; gap: 6px; }
+.nav a {
+    color: var(--ink-soft); text-decoration: none;
+    padding: 8px 16px; border-radius: var(--radius); font-size: 14px;
+    border: 1px solid transparent;
+}
+.nav a:hover { background: var(--panel); color: var(--ink); }
+.nav a.on { background: var(--panel-2); color: var(--gold-soft); border-color: var(--border); }
+
+/* --- Contenu --- */
+.content { max-width: 1100px; margin: 28px auto; padding: 0 24px; }
+h1 { font-family: var(--serif); color: var(--gold-soft); font-weight: 600; margin: 0 0 20px; }
+h2 { font-family: var(--serif); color: var(--gold-soft); font-size: 18px; margin: 26px 0 10px; }
+h3 { font-size: 14px; color: var(--ink-soft); }
+.foot { text-align: center; color: var(--muted); font-size: 12px; padding: 30px; }
+
+/* --- Cartes & grille --- */
+.card {
+    background: linear-gradient(180deg, var(--panel), var(--bg-2));
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    box-shadow: 0 4px 18px rgba(0,0,0,.35);
+}
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; align-items: start; }
+@media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+
+/* --- Formulaires --- */
+label { display: block; margin: 14px 0; font-size: 13px; color: var(--ink-soft); }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 620px) { .row { grid-template-columns: 1fr; } }
+input[type=text], input[type=number], select, textarea {
+    width: 100%; margin-top: 6px;
+    background: #17130d; color: var(--ink);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 12px; font-family: var(--sans); font-size: 14px;
+}
+textarea { resize: vertical; font-family: ui-monospace, "Cascadia Code", Consolas, monospace; }
+input:focus, select:focus, textarea:focus {
+    outline: none; border-color: var(--gold); box-shadow: 0 0 0 2px rgba(201,162,75,.18);
+}
+small { display: block; margin-top: 5px; color: var(--muted); font-size: 12px; }
+
+/* --- Champ date (calendrier tamrielien) --- */
+.date-block { margin: 14px 0; }
+.date-legend { display: block; font-size: 13px; color: var(--ink-soft); }
+.date-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1.2fr; gap: 12px; }
+.date-grid label { margin: 6px 0 0; }
+@media (max-width: 620px) { .date-grid { grid-template-columns: 1fr 1fr; } }
+code { background: #100d09; padding: 1px 6px; border-radius: 5px; color: var(--gold-soft); font-size: 12px; }
+
+/* --- Boutons --- */
+.btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--panel-2); color: var(--ink);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 9px 16px; font-size: 14px; cursor: pointer; text-decoration: none;
+    transition: transform .05s, background .15s;
+}
+.btn:hover { background: #332b1f; }
+.btn:active { transform: translateY(1px); }
+.btn.primary { background: linear-gradient(180deg, var(--gold), #a9832f); color: #1a1408; border-color: #8a6c26; font-weight: 600; }
+.btn.primary:hover { filter: brightness(1.06); }
+.btn.danger { background: #4a241f; border-color: #6d332a; color: #f0c3b9; }
+.btn.small { padding: 5px 11px; font-size: 12px; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* --- Alertes --- */
+.alert { padding: 12px 16px; border-radius: 8px; margin: 14px 0; border: 1px solid; font-size: 14px;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.alert.success { background: rgba(127,174,107,.12); border-color: rgba(127,174,107,.4); color: #cfe6c2; }
+.alert.error   { background: rgba(207,106,90,.12);  border-color: rgba(207,106,90,.4);  color: #f0c3b9; }
+.alert.warning { background: rgba(215,162,74,.12);  border-color: rgba(215,162,74,.4);  color: #ecd4a0; }
+
+/* --- Panneau résultat + logs --- */
+.result-panel { min-height: 200px; }
+.muted { color: var(--muted); }
+.logs-title { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 12px; }
+.logs { list-style: none; padding: 0; margin: 8px 0 0; font-size: 13px; }
+.log { display: flex; gap: 9px; padding: 5px 8px; border-radius: 6px; align-items: baseline; }
+.log + .log { margin-top: 2px; }
+.log.error { background: rgba(207,106,90,.08); color: #eab8ae; }
+.log.success { color: #bcd9ab; }
+.log.warning { color: #e6cb92; }
+.log.info { color: var(--ink-soft); }
+.log-icon { flex: 0 0 auto; }
+
+/* --- Indicateurs d'activité ---
+   Le spinner était piloté par les classes que HTMX posait sur le DOM ; il est
+   maintenant rendu conditionnellement par React. */
+.spinner { width: 14px; height: 14px; border: 2px solid rgba(0,0,0,.3); border-top-color: #1a1408;
+    border-radius: 50%; display: inline-block; animation: spin .7s linear infinite; }
+.spinner.on-dark { border-color: rgba(232,223,206,.25); border-top-color: var(--gold-soft); }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.loading { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; padding: 24px 0; }
+
+/* Rafraîchissement en arrière-plan : le contenu reste lisible et cliquable, il
+   signale juste qu'il n'est plus tout à fait à jour. */
+.stale { opacity: .55; transition: opacity .15s; }
+
+/* --- Filtres historique --- */
+.filters { display: flex; gap: 16px; align-items: end; flex-wrap: wrap; margin-bottom: 18px; }
+.filters label { margin: 0; }
+.filters .grow { flex: 1; min-width: 180px; }
+
+/* --- Tableau --- */
+.table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.table th { text-align: left; color: var(--muted); font-weight: 600; text-transform: uppercase;
+    font-size: 11px; letter-spacing: .5px; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.table td { padding: 9px 10px; border-bottom: 1px solid rgba(58,50,37,.5); vertical-align: top; }
+.table tr:hover td { background: rgba(201,162,75,.05); }
+.nowrap { white-space: nowrap; }
+.ellipsis { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-soft); }
+.tag { background: #2f2717; color: var(--gold-soft); padding: 2px 9px; border-radius: 20px; font-size: 12px; border: 1px solid var(--border); }
+.count { margin: 4px 0 12px; }
+.empty { padding: 30px; text-align: center; }
+.pager { display: flex; gap: 14px; align-items: center; justify-content: center; margin-top: 18px; }
+
+/* --- Détail --- */
+.meta-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+@media (max-width: 700px) { .meta-grid { grid-template-columns: 1fr; } }
+.meta-grid .k { display: block; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 3px; }
+.text-block { white-space: pre-wrap; line-height: 1.7; }
+.code { white-space: pre; overflow-x: auto; font-family: ui-monospace, Consolas, monospace; font-size: 13px; color: var(--ink-soft); }
+
+/* --- Paramètres --- */
+.setting { display: grid; grid-template-columns: 220px 1fr 200px; gap: 14px; align-items: center;
+    padding: 10px; border-radius: 8px; margin: 6px 0; }
+@media (max-width: 760px) { .setting { grid-template-columns: 1fr; gap: 6px; } }
+.setting.error { background: rgba(207,106,90,.07); }
+.setting-label { font-size: 13px; }
+.setting-label code { display: block; margin-top: 3px; }
+.req { color: var(--red); }
+.status-badge { font-size: 12px; }
+.status-badge.ok { color: var(--green); }
+.status-badge.error { color: var(--red); }
+.status-badge.empty { color: var(--muted); }
+
+/* --- Carte des touches --------------------------------------------------------
+   Le châssis reste « grimoire » (cartes, or, serif). Les couleurs des keycaps,
+   elles, arrivent en variables inline depuis backend/core/keyboard_layout.py :
+   --ink (texte), --edge (contour + bordure basse), --face (fond), --u (largeur
+   en unités de touche). Aucune famille n'est écrite ici : en ajouter une ne
+   demande aucune retouche de cette feuille. */
+:root {
+    --key-u: 46px;     /* largeur d'une touche « 1 unité » */
+    --key-gap: 5px;
+    --key-h: 50px;
+}
+
+.keys-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.keys-head h1 { margin-bottom: 0; }
+.keys-intro { max-width: 760px; margin: 10px 0 20px; font-size: 13px; }
+
+/* Le clavier a une largeur minimale : on le laisse défiler plutôt que le tasser. */
+.keymap-card { overflow-x: auto; }
+.keymap-board { display: flex; align-items: flex-start; gap: 26px; min-width: max-content; }
+.board-title {
+    font-size: 10px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 2px; margin-bottom: 8px; padding-left: 2px;
+}
+.numpad, .mouse { padding-top: 26px; }
+.key-row { display: flex; gap: var(--key-gap); margin-bottom: var(--key-gap); }
+.mouse .key-row { justify-content: stretch; }
+
+/* --- Keycap --- */
+.keycap {
+    /* Largeur = n unités + les gouttières internes qu'elle recouvre. */
+    flex: 0 0 calc(var(--u) * var(--key-u) + (var(--u) - 1) * var(--key-gap));
+    width: calc(var(--u) * var(--key-u) + (var(--u) - 1) * var(--key-gap));
+    height: var(--key-h);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 1px; padding: 3px 4px; overflow: hidden;
+    background: var(--face); color: var(--ink);
+    border: 1px solid var(--edge);
+    border-bottom: 3px solid var(--edge);   /* relief : la famille porte le socle */
+    border-radius: 6px;
+    cursor: pointer; text-align: center;
+    font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+    transition: filter .12s, box-shadow .12s;
+}
+.keycap:hover { filter: brightness(1.25); }
+.keycap:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(201,162,75,.45); }
+/* Enfoncement : la touche descend et son socle s'écrase. */
+.keycap:active { transform: translateY(1px); border-bottom-width: 2px; }
+.keycap.free { opacity: .75; }
+.keycap.bound { box-shadow: 0 1px 6px rgba(0,0,0,.4); }
+
+.cap-legend { font-size: 12px; line-height: 1.1; }
+.cap-action {
+    font-size: 8.5px; line-height: 1.15; opacity: .85;
+    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.keycap.bound .cap-legend { font-weight: 600; }
+
+/* --- Bandeau de légende --- */
+.legend {
+    display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center;
+    margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border);
+    font-size: 12px; color: var(--ink-soft);
+}
+.legend-item { display: inline-flex; align-items: center; gap: 7px; }
+.legend-chip {
+    width: 14px; height: 14px; border-radius: 4px;
+    background: var(--face); border: 1px solid var(--edge); border-bottom-width: 3px;
+}
+.legend-count {
+    background: var(--face); color: var(--ink);
+    border: 1px solid var(--edge); border-radius: 20px;
+    padding: 0 8px; font-size: 11px; font-family: ui-monospace, Consolas, monospace;
+}
+.legend-free { color: var(--muted); }
+
+/* --- Panneau d'édition ---
+   Flottant : la carte est haute, un panneau en flux passerait sous la ligne de
+   flottaison et le clic sur une touche semblerait sans effet. */
+.key-editor:empty { display: none; }
+.key-editor {
+    position: fixed; right: 26px; bottom: 26px; z-index: 20; width: 380px; max-width: calc(100vw - 32px);
+}
+.key-editor-panel {
+    background: linear-gradient(180deg, var(--panel), var(--bg-2));
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px 18px 18px; box-shadow: 0 10px 34px rgba(0,0,0,.55);
+}
+.editor-head { display: flex; align-items: center; gap: 12px; }
+.editor-cap {
+    flex: 0 0 auto; min-width: 44px; padding: 8px 10px; text-align: center;
+    background: var(--bg); border: 1px solid var(--border); border-bottom-width: 3px;
+    border-radius: 6px; color: var(--gold-soft);
+    font-family: ui-monospace, Consolas, monospace; font-size: 13px;
+}
+.editor-title { font-family: var(--serif); color: var(--gold-soft); font-size: 15px; letter-spacing: .5px; }
+/* Le scan code : présent pour qui le cherche, jamais encombrant. */
+.editor-code { font-size: 11px; color: var(--muted); }
+.editor-code code { font-size: 11px; }
+.editor-close { margin-left: auto; padding: 4px 9px; }
+
+/* --- Pastilles de famille --- */
+.pill-block { margin: 14px 0; }
+.pill-legend { display: block; font-size: 13px; color: var(--ink-soft); margin-bottom: 7px; }
+.pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.pill { position: relative; margin: 0; cursor: pointer; }
+.pill input { position: absolute; opacity: 0; width: 0; height: 0; }
+.pill span {
+    display: block; padding: 5px 12px; border-radius: 20px; font-size: 12px;
+    background: var(--bg); color: var(--muted);
+    border: 1px solid var(--border); transition: background .12s, color .12s;
+}
+.pill:hover span { color: var(--ink-soft); }
+.pill input:checked + span { background: var(--face); color: var(--ink); border-color: var(--edge); }
+.pill input:focus-visible + span { box-shadow: 0 0 0 2px rgba(201,162,75,.4); }
+
+.editor-actions { display: flex; gap: 10px; margin-top: 16px; }
+
+@media (max-width: 620px) {
+    .key-editor { right: 8px; left: 8px; bottom: 8px; width: auto; }
+}
+
+/* --- Ajouts de la SPA ----------------------------------------------------------
+   Ce que l'ancienne interface obtenait « gratuitement » du rechargement de page et
+   qu'il faut désormais rendre explicite. */
+
+/* Le bandeau de navigation est en <button>/<NavLink> et non en <a> nu. */
+.nav a, .nav button {
+    font-family: inherit; background: none; cursor: pointer;
+}
+
+/* Barre d'état de configuration, affichée sur toutes les pages quand l'app n'est
+   pas configurée : la SPA ne recharge plus, il faut un signal persistant. */
+.config-banner { margin: 0 auto; max-width: 1100px; padding: 0 24px; }
+.config-banner .alert { margin-top: 18px; }
+
+/* Recherche de l'historique : la saisie est débouncée, on le montre. */
+.filters .searching { color: var(--gold-soft); }
+
+/* Carte des touches : filtre par famille et recherche d'action, impossibles à
+   rendre agréables tant que chaque interaction repartait au serveur. */
+.keymap-toolbar {
+    display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center;
+    margin-bottom: 16px;
+}
+.keymap-toolbar .grow { flex: 1; min-width: 200px; }
+.keymap-toolbar label { margin: 0; }
+
+/* Touche estompée parce qu'elle ne correspond pas au filtre courant. */
+.keycap.dimmed { opacity: .18; }
+.keycap.hit { box-shadow: 0 0 0 2px var(--gold); }
+
+/* Pastille de famille cliquable dans la légende (filtre). */
+.legend-item.filterable { cursor: pointer; border-radius: 20px; padding: 2px 8px; margin: -2px -8px; }
+.legend-item.filterable:hover { background: rgba(201,162,75,.08); }
+.legend-item.active { background: rgba(201,162,75,.14); color: var(--ink); }
+
+/* Page introuvable. */
+.notfound { text-align: center; padding: 60px 20px; }
+.notfound h1 { margin-bottom: 8px; }

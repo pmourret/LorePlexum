@@ -1,0 +1,113 @@
+from datetime import datetime
+
+from collections import defaultdict
+import os
+import unicodedata
+
+from backend.core.fiss_document import FissDocument, FissError
+from backend.core.reporter import Reporter
+
+
+class PDFGenerator:
+    def __init__(self, xml_file_path, output_dir, pdf_export_file=None, reporter=None):
+        self.reporter = reporter or Reporter()
+        self.xml_file_path = xml_file_path
+        self.output_dir = output_dir
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
+        # Le préfixe du nom de fichier est désormais un paramètre (avec repli sur
+        # l'env), au lieu d'instancier un EnvLoader qui revalidait tout le .env.
+        prefix = pdf_export_file or os.getenv("PDF_EXPORT_FILE") or "Journal"
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        self.output_pdf_path = os.path.join(self.output_dir, f"{prefix}_{current_date}.pdf")
+
+    @staticmethod
+    def normalize_text(text):
+        """Normalize text to handle Unicode rendering."""
+        return unicodedata.normalize("NFKD", text)
+
+    def extract_entries_by_date(self):
+        """Regroupe les entrées du journal par date à partir du XML FISS.
+
+        Passe par la couche pivot ``FissDocument`` (scan séquentiel des paires
+        ``Date{N}``/``entry{N}``, casse tolérée en lecture) plutôt que de lire
+        ``ElementTree`` directement : l'ancienne version testait
+        ``tag.startswith("date")`` en minuscule et ne voyait donc AUCUNE date sur
+        un vrai export du jeu, qui utilise ``<Date1>`` (D majuscule).
+        """
+        try:
+            document = FissDocument.load(self.xml_file_path)
+        except FissError as e:
+            raise ValueError(f"Erreur lors de l'extraction des données XML : {e}")
+
+        entries_by_date = defaultdict(list)
+        for entry in document.entries:
+            date_key = (entry.date or "").strip()
+            entries_by_date[date_key].append(self.normalize_text((entry.text or "").strip()))
+        return {date: "<br>".join(entries) for date, entries in entries_by_date.items()}
+
+    def generate_pdf(self):
+        """Génère le PDF à partir du HTML via WeasyPrint (pur Python + libs système).
+
+        WeasyPrint remplace pdfkit/wkhtmltopdf : plus aucun binaire externe à
+        installer. La numérotation des pages passe par les CSS Paged Media
+        (`@page` + `counter(page)`), en lieu et place du pied de page JavaScript
+        que renseignait wkhtmltopdf.
+        """
+        # Import tardif volontaire : WeasyPrint tire des bibliothèques système
+        # (Pango/Cairo). En l'important ici plutôt qu'au chargement du module, leur
+        # absence éventuelle (poste de dev Windows sans GTK) n'affecte QUE la
+        # génération du PDF — l'injection JSON/XML reste fonctionnelle, l'échec étant
+        # rattrapé et signalé comme non bloquant par InjectionService.
+        from weasyprint import HTML
+
+        entries_by_date = self.extract_entries_by_date()
+
+        # Construire le contenu HTML avec styles CSS améliorés
+        html_content = """
+        <html>
+        <head>
+        <meta charset="utf-8">
+        <style>
+            @page {
+                margin: 40px;
+                @bottom-right {
+                    content: "Page " counter(page) " / " counter(pages);
+                    font-size: 10px;
+                    color: #888;
+                }
+            }
+            body { font-family: Arial, sans-serif; line-height: 1.6; }
+            h1 { text-align: center; font-size: 24px; color: #333; margin-bottom: 20px; }
+            .date { margin-top: 30px; font-weight: bold; font-size: 18px; color: #222; }
+            .entry { margin-top: 10px; margin-bottom: 30px; text-indent: 20px; }
+            hr { border: none; border-top: 1px solid #ccc; margin: 20px 0; }
+        </style>
+        </head>
+        <body>
+        <h1>Journal d'Abyssiaelle</h1>
+        """
+
+        # Ajout des entrées
+        for date, text in entries_by_date.items():
+            html_content += f"<div class='date'>Date: {date}</div>"
+            html_content += f"<div class='entry'>{text}</div><hr>"
+
+        html_content += "</body></html>"
+
+        # Générer le PDF (le pied de page/numérotation est géré par le CSS @page).
+        HTML(string=html_content).write_pdf(self.output_pdf_path)
+
+    def run(self):
+        """Execute the process of extracting entries and generating the PDF.
+
+        Retourne le chemin du PDF généré (ou None en cas d'échec) afin que la couche
+        appelante puisse l'exposer (lien de téléchargement web, log CLI...).
+        """
+        try:
+            self.generate_pdf()
+            self.reporter.success(f"PDF généré avec succès dans {self.output_pdf_path}")
+            return self.output_pdf_path
+        except Exception as e:
+            self.reporter.error(f"Problème de génération du PDF : {e}")
+            return None

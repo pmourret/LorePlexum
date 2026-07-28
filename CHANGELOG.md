@@ -14,6 +14,136 @@ Catégories utilisées : **Ajouté**, **Modifié**, **Corrigé**, **Supprimé**,
 ## [Non publié]
 
 ### Ajouté
+- **Refactor backend/frontend — phase 1 : un backend structuré et une API JSON.**
+  Première des trois phases d'une migration en *strangler* vers un backend et un
+  frontend déployables séparément. L'application reste utilisable de bout en bout
+  à chaque étape : l'interface HTMX existante n'a rien perdu.
+  - **Frontend React/TypeScript autonome** (`frontend/`) : Vite, React Router,
+    TanStack Query. Les cinq pages sont portées (Injecter, Historique, Détail,
+    Touches, Paramètres) et l'ancienne interface HTMX est supprimée.
+    - Le **client TypeScript est généré** depuis l'OpenAPI du backend
+      (`npm run generate:api`) : le contrat n'est écrit qu'une fois, côté Pydantic,
+      et une divergence devient une erreur de compilation plutôt qu'un bug à
+      l'exécution.
+    - Le **thème « grimoire » est porté tel quel** — mêmes variables, mêmes noms de
+      classes, même rendu. Le choix d'une feuille globale plutôt que de CSS Modules
+      est délibéré : ces classes sont déjà cloisonnées par convention de nommage.
+    - Les **filtres de l'historique vivent dans l'URL** : un historique filtré reste
+      partageable et le bouton « précédent » du navigateur fonctionne.
+    - La **carte des touches gagne un filtre par famille et une recherche** d'action
+      ou de mémo, instantanés — l'état complet arrive en un appel, là où l'ancienne
+      interface rechargeait le clavier au serveur à chaque édition.
+    - Le **sélecteur de date calcule tout localement**, bornes du mois comprises.
+  - **Déploiement séparé en deux conteneurs** derrière Traefik, sur le même host :
+    `PathPrefix(/api)` (priorité 100) vers le backend, catch-all (priorité 1) vers
+    le frontend. Le navigateur reste donc en **same-origin** — aucune configuration
+    CORS nulle part, en développement (proxy Vite) comme en production.
+    - `backend/Dockerfile` ne copie plus que `backend/` ; `frontend/Dockerfile` est
+      un build multi-étapes `node:22-alpine` → `nginx:alpine` (~75 Mo, sans runtime JS).
+    - `nginx.conf` : repli SPA sur `index.html` pour les routes profondes, assets
+      hashés en cache immuable, et `index.html` en `no-store` — un `index.html`
+      périmé pointant vers des assets disparus est la cause classique de la page
+      blanche après déploiement.
+    - `deploy/Makefile` : `make logs|shell|restart S=<service>` pour cibler un seul
+      conteneur ; `make check` rappelle que l'accès n'est pas authentifié.
+  - `run_web.ps1` devient `run_dev.ps1` et lance les deux serveurs.
+  - **API JSON versionnée `/api/v1`**, documentée sur `/api/docs` (OpenAPI sur
+    `/api/openapi.json`) : santé, catégories, arcs, métadonnées, calendrier,
+    injections (création, historique paginé, détail, PDF), carte des touches,
+    paramètres. Les schémas Pydantic (`backend/app/schemas/`) sont la **seule**
+    source du contrat — le client TypeScript de la phase 2 en sera généré.
+  - Un **doublon** répond désormais `409 Conflict` avec le corps complet (journal
+    d'exécution + injection existante) plutôt qu'un `200` portant `success: false` ;
+    on force en rejouant le `POST` avec `allow_duplicate: true`.
+  - Une **configuration invalide** répond `503` et non `500` : le service va bien,
+    c'est son environnement qui ne va pas, et le client doit renvoyer vers la page
+    Paramètres. `/api/v1/health` reste joignable dans ce cas — il ne dépend pas du
+    service — pour que le frontend puisse diagnostiquer au lieu d'afficher une
+    page blanche.
+  - `GET /api/v1/calendar` renvoie **tout** le calendrier tamrielien en un appel, et
+    `GET /api/v1/keymap` **tout** l'état de la carte des touches. Les allers-retours
+    HTMX `/suggest-date`, `/date-days` et le rechargement du clavier à chaque
+    édition de touche n'ont plus lieu d'être côté client.
+- **Tests de l'orchestrateur et du contrat d'API** (`tests/test_injection_service.py`,
+  `tests/test_api_*.py`, `tests/test_legacy_ui.py`, fixtures dans
+  `tests/conftest.py`). `InjectionService` n'était couvert par aucun test alors
+  qu'il porte l'invariant le plus important du projet — **le JSON n'est écrit
+  qu'après le succès de l'injection XML** — qui est désormais verrouillé.
+  Chaque test monte un environnement applicatif jetable ; aucune donnée réelle
+  n'est touchée. La suite passe de 33 à 96 tests.
+- `requirements-dev.txt` : dépendances de test, exclues de l'image de production.
+
+### Modifié
+- **`src/` devient `backend/core/`**, modules renommés en `snake_case` (PEP 8) —
+  `InjectionService.py` → `injection_service.py`, etc. Aucun changement de logique.
+- **Nouveau point d'entrée ASGI : `backend.app.main:app`** (au lieu de
+  `webapp.main:app`). `Dockerfile` et `run_web.ps1` mis à jour.
+- **Les singletons de module disparaissent au profit de `Depends`.**
+  `webapp/main.py` (418 lignes) créait ses bases de données à l'import et
+  reconstruisait la configuration à chaque requête via un `build_service()` global :
+  rien n'était surchargeable, donc rien n'était testable sans toucher au vrai `.env`
+  ni aux vraies bases. Tout passe désormais par `backend/app/deps.py`.
+- **Réglages de déploiement typés** (`backend/app/config.py`, `pydantic-settings`),
+  distingués des réglages applicatifs éditables : les premiers sont fixés au
+  démarrage et mis en cache, les seconds sont relus à chaque requête puisque la
+  page Paramètres peut les changer à chaud.
+- `webapp/main.py` devient `webapp/ui.py` et passe de `FastAPI()` à `APIRouter` :
+  l'API et l'UI vivent sur une seule application. Son retrait, une fois la SPA en
+  place, sera une ligne à supprimer dans `create_app()`.
+- Une **famille de touches inconnue** est maintenant refusée (`422`) au lieu d'être
+  ignorée silencieusement : le formulaire semblait accepté alors que rien n'était
+  écrit en base.
+- L'historique et le détail n'exposent plus `pdf_path` en liste ; un booléen
+  `has_pdf` suffit, le téléchargement passe par `/api/v1/injections/{id}/pdf`.
+
+### Corrigé
+- **La page Paramètres déclarait invalide une installation Docker correcte.**
+  La validation ne lisait que le fichier `.env` — or en conteneur la configuration
+  arrive par variables d'environnement (`env_file:` du compose) et le `.env` est
+  exclu de l'image par `.dockerignore`. Tous les champs requis apparaissaient donc
+  « Requis mais vide », le bandeau « Configuration incomplète » s'affichait et le
+  bouton **Injecter était désactivé**. La validation lit désormais la configuration
+  *effective* — variables d'environnement puis fichier, dans l'ordre de priorité que
+  `EnvLoader` applique réellement.
+- **Les paramètres saisis depuis l'interface étaient perdus à chaque rebuild.**
+  L'écriture visait `<racine>/.env`, c'est-à-dire la couche d'image Docker. Le
+  chemin est maintenant réglable via `CONFIG_ENV_PATH`, à pointer sur le volume
+  persistant (`/data/app.env`) — `make check` le vérifie en pré-vol.
+- `PUT /api/v1/settings` n'écrit que les clés déclarées : une requête ne peut pas
+  injecter une variable arbitraire dans le fichier de configuration.
+- **La validation et le chargement de la configuration lisaient deux fichiers
+  différents.** `EnvLoader` faisait un `load_dotenv()` sans argument, qui
+  redécouvre le `.env` du dépôt en remontant depuis le répertoire courant, pendant
+  que la validation jugeait `CONFIG_ENV_PATH`. `/health` pouvait donc répondre
+  « configuration valide » alors que l'injection échouait en `503` sur des chemins
+  venus d'ailleurs — et en production, les chemins saisis depuis la page Paramètres
+  n'auraient jamais été lus. `EnvLoader` reçoit désormais le chemin explicitement.
+- **Un champ de configuration laissé vide cassait l'injection suivante.** La page
+  Paramètres écrit une chaîne vide dans l'environnement pour un champ vide ;
+  `os.getenv("MAX_TOKENS_PER_ENTRY", 500)` renvoyait alors `""` et non son défaut,
+  et `int("")` levait **au milieu du pipeline**, après l'injection JSON en mémoire.
+  L'utilisateur voyait « erreur lors de l'injection dans le XML », sans rapport avec
+  la cause. Même correction pour `PDF_OUTPUT_PATH` et `PDF_EXPORT_FILE`.
+- `GET /api/v1/metadata-files/{filename}` valide le nom **par appartenance** à la
+  liste réelle du dossier plutôt que de le concaténer au chemin : un nom relatif ne
+  correspond à aucune entrée et sort en `404`, sans lecture hors du dossier.
+
+### Supprimé
+- **L'interface en ligne de commande**, dépréciée depuis la 0.3.0 : `Main.py`,
+  `src/LorePlexum.py`, `src/ShellPrinter.py`, `src/DataExtractor.py`,
+  `run_tnfc.ps1`. Le pipeline reste identique, seul l'adaptateur console disparaît.
+- `webapp/settings.py`, remplacé par `backend/app/env_file.py`.
+- **L'interface HTMX** (`webapp/`) : gabarits Jinja2, feuille de style, HTMX
+  vendorisé et `keymap.js`, remplacés par le frontend React.
+
+### Sécurité
+- L'application n'a **aucune authentification applicative** — choix explicite pour
+  un outil mono-utilisateur. `PUT /api/v1/settings` écrivant des chemins du système
+  de fichiers, la restriction doit être posée au **niveau réseau** (allowlist IP
+  Traefik, VPN, Tailscale) avant toute exposition publique. `make check` et
+  `DEPLOYMENT.md` le rappellent explicitement.
+
+### Ajouté
 - **Makefile de déploiement** (`deploy/Makefile`) : enveloppe les commandes de
   `DEPLOYMENT.md` (`make init` / `check` / `up` / `deploy` / `recreate` / `logs` /
   `shell` / `backup`), sans ajouter d'étape — les `docker compose` restent

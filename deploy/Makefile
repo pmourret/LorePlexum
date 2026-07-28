@@ -12,8 +12,11 @@
 # Usage : cd deploy && make <cible>   (make seul affiche l'aide)
 
 COMPOSE   := docker compose
-SERVICE   := tnfc
-CONTAINER := loreplexum-injector
+# Deux services depuis le refactor backend/frontend. `S` permet d'en cibler un :
+#   make logs S=frontend   make shell S=backend   make restart S=backend
+S         ?=
+BACKEND   := backend
+CONTAINER := loreplexum-backend
 MOUNT     := /mnt/TakeNotes
 NETWORK   := proxy
 STAMP     := $(shell date +%Y%m%d-%H%M%S)
@@ -55,10 +58,10 @@ check: ## Vérifie les prérequis avant déploiement (montage, réseau, variable
 		for v in FULL_CONTEXT_JSON_PATH ENTRIES_DIR TAKE_NOTES_EXPORT_DIR; do \
 			grep -q "^$$v=.\+" app.env || { echo "  ✗ $$v vide dans app.env"; ok=1; }; \
 		done; \
-		for v in DATABASE_PATH KEYBINDS_DB_PATH; do \
+		for v in DATABASE_PATH KEYBINDS_DB_PATH CONFIG_ENV_PATH; do \
 			grep -q "^$$v=/data/" app.env \
 				|| { echo "  ✗ $$v absent ou hors de /data dans app.env :"; \
-				     echo "      la base serait créée dans l'image et perdue au prochain build"; ok=1; }; \
+				     echo "      le fichier serait créé dans l'image et perdu au prochain build"; ok=1; }; \
 		done; \
 	fi; \
 	mountpoint -q $(MOUNT) 2>/dev/null \
@@ -68,17 +71,24 @@ check: ## Vérifie les prérequis avant déploiement (montage, réseau, variable
 		&& echo "  ✓ réseau '$(NETWORK)' présent" \
 		|| { echo "  ✗ réseau '$(NETWORK)' absent — 'docker network create $(NETWORK)'"; ok=1; }; \
 	echo; \
+	echo "  ! Aucune authentification applicative : vérifiez que l'accès est"; \
+	echo "    restreint au niveau réseau (allowlist IP Traefik, VPN) avant toute"; \
+	echo "    exposition publique — /api/v1/settings écrit des chemins disque."; \
+	echo; \
 	[ $$ok -eq 0 ] && echo "Prêt pour 'make up'." || { echo "Corrigez les points ci-dessus."; exit 1; }
 
 # --- Cycle de vie --------------------------------------------------------------
 
-build: ## Reconstruit l'image sans démarrer
+build: ## Reconstruit les images sans démarrer
 	$(COMPOSE) build
 
 up: check ## Démarre (ou met à jour) la stack après reconstruction
 	$(COMPOSE) up -d --build
 	@echo
-	@echo "En ligne sur https://$$(grep '^APP_HOST=' .env | cut -d= -f2-)/"
+	@host=$$(grep '^APP_HOST=' .env | cut -d= -f2-); \
+	 echo "  SPA : https://$$host/"; \
+	 echo "  API : https://$$host/api/v1/health"; \
+	 echo "  Doc : https://$$host/api/docs"
 
 deploy: ## Met à jour depuis git puis redéploie (flux de mise à jour nominal)
 	git pull
@@ -90,19 +100,19 @@ recreate: ## Recrée les conteneurs de force — requis après un changement de 
 down: ## Arrête et supprime les conteneurs (le volume de données est conservé)
 	$(COMPOSE) down
 
-restart: ## Redémarre le service sans reconstruire
-	$(COMPOSE) restart $(SERVICE)
+restart: ## Redémarre les services sans reconstruire (S=backend pour un seul)
+	$(COMPOSE) restart $(S)
 
 # --- Exploitation --------------------------------------------------------------
 
-logs: ## Suit les logs (Ctrl-C pour quitter)
-	$(COMPOSE) logs -f
+logs: ## Suit les logs des deux services (S=backend pour n'en suivre qu'un)
+	$(COMPOSE) logs -f $(S)
 
 ps: ## État des conteneurs
 	$(COMPOSE) ps
 
-shell: ## Ouvre un shell dans le conteneur
-	$(COMPOSE) exec $(SERVICE) /bin/bash
+shell: ## Ouvre un shell dans le backend (S=frontend pour l'autre)
+	$(COMPOSE) exec $(if $(S),$(S),$(BACKEND)) /bin/sh
 
 backup: ## Archive les bases SQLite du volume dans ./backups/
 	@docker container inspect $(CONTAINER) >/dev/null 2>&1 \

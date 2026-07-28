@@ -1,30 +1,46 @@
-# Déploiement de TNFCDataInjector sur le serveur Docker « hiatus » (derrière Traefik).
+# Déploiement de LorePlexum sur le serveur Docker « hiatus » (derrière Traefik).
+#
+# DEUX services depuis le refactor backend/frontend :
+#   - `backend`  : l'API FastAPI, seule à toucher au partage et aux bases ;
+#   - `frontend` : la SPA React construite, servie par nginx.
+#
+# Ils partagent le MÊME host et sont départagés par le chemin, via la priorité des
+# routers Traefik : `PathPrefix(/api)` gagne sur le catch-all `Host(...)`. Le
+# navigateur reste donc toujours en same-origin — aucune configuration CORS n'est
+# nécessaire, ce qui compte d'autant plus qu'il n'y a pas d'authentification
+# applicative (voir « Accès » ci-dessous).
 #
 # - Le dossier TakeNotes du partage « auditus » est monté sur l'HÔTE via /etc/fstab
 #   (mount.cifs + fichier de credentials, déjà éprouvé) à /mnt/TakeNotes. Le
 #   conteneur le BIND-MONTE : Docker ne gère pas le CIFS lui-même.
 #   -> évite l'écueil « credentials= inconnu du syscall mount » du driver local.
-# - La base d'archivage SQLite vit dans un volume Docker nommé (persistant).
+# - Les bases SQLite et le fichier de configuration éditable vivent dans un volume
+#   Docker nommé (persistant), JAMAIS dans l'image.
 # - L'exposition HTTP est assurée par Traefik via le réseau externe `proxy` :
 #   pas de port publié directement sur l'hôte.
 #
-# Un seul fichier d'environnement (voir les .example à côté) :
+# Deux fichiers d'environnement (voir les .example à côté) :
 #   - .env      : lu par Docker Compose pour l'interpolation ${APP_HOST} du label
 #                 Traefik. NE PAS versionner.
 #   - app.env   : configuration de l'APPLICATION (chemins Linux sous /mnt/TakeNotes),
-#                 injectée dans le conteneur via env_file.
+#                 injectée dans le conteneur backend via env_file.
 #
 # Prérequis sur l'hôte hiatus :
 #   - le dossier TakeNotes monté à /mnt/TakeNotes via /etc/fstab (voir DEPLOYMENT.md) ;
 #   - le réseau Docker externe `proxy` (partagé avec Traefik).
+#
+# ⚠️ Accès : l'application n'a AUCUNE authentification applicative. `PUT /api/v1/settings`
+# écrit des chemins du système de fichiers. La restriction doit donc être posée au
+# niveau réseau — middleware `ipallowlist` Traefik, VPN ou Tailscale — AVANT toute
+# exposition publique. Voir DEPLOYMENT.md.
 
 services:
-  tnfc:
+  backend:
     build:
       context: ..
-      dockerfile: Dockerfile
-    image: loreplexum-injector:latest
-    container_name: loreplexum-injector
+      dockerfile: backend/Dockerfile
+    image: loreplexum-backend:latest
+    container_name: loreplexum-backend
     restart: unless-stopped
     env_file:
       - app.env
@@ -38,10 +54,39 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=proxy
-      - traefik.http.routers.loreplexum.rule=Host(`${APP_HOST}`)
-      - traefik.http.routers.loreplexum.entrypoints=websecure
-      - traefik.http.routers.loreplexum.tls.certresolver=duckdns
-      - traefik.http.services.loreplexum.loadbalancer.server.port=8000
+      # priority > celle du frontend : `/api/...` est routé ici, le reste tombe
+      # dans le catch-all. Sans priorité explicite, Traefik départage par longueur
+      # de règle et le résultat dépend de l'écriture des règles — on ne laisse pas
+      # le routage de l'API à un détail d'implémentation.
+      - traefik.http.routers.loreplexum-api.rule=Host(`${APP_HOST}`) && PathPrefix(`/api`)
+      - traefik.http.routers.loreplexum-api.priority=100
+      - traefik.http.routers.loreplexum-api.entrypoints=websecure
+      - traefik.http.routers.loreplexum-api.tls.certresolver=duckdns
+      - traefik.http.routers.loreplexum-api.service=loreplexum-api
+      - traefik.http.services.loreplexum-api.loadbalancer.server.port=8000
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    image: loreplexum-frontend:latest
+    container_name: loreplexum-frontend
+    restart: unless-stopped
+    # Aucun volume, aucune variable : l'image ne contient que des fichiers
+    # statiques. Elle ne connaît ni le partage, ni les bases, ni la configuration.
+    networks:
+      - proxy
+    depends_on:
+      - backend
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.loreplexum-web.rule=Host(`${APP_HOST}`)
+      - traefik.http.routers.loreplexum-web.priority=1
+      - traefik.http.routers.loreplexum-web.entrypoints=websecure
+      - traefik.http.routers.loreplexum-web.tls.certresolver=duckdns
+      - traefik.http.routers.loreplexum-web.service=loreplexum-web
+      - traefik.http.services.loreplexum-web.loadbalancer.server.port=80
 
 networks:
   # Réseau partagé avec Traefik, créé hors de ce compose.
@@ -49,6 +94,7 @@ networks:
     external: true
 
 volumes:
-  # Base SQLite (historique + anti-doublon) : persistée hors de l'image.
+  # Bases SQLite (historique, anti-doublon, carte des touches) et fichier de
+  # configuration écrit par la page Paramètres : persistés hors de l'image.
   tnfc-data:
     driver: local

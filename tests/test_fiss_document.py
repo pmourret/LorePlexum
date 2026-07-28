@@ -15,7 +15,7 @@ Lancer :  python -m unittest discover -s tests
 import os
 import unittest
 
-from src.FissDocument import FissDocument, FissEntry, FissError
+from backend.core.fiss_document import FissDocument, FissEntry, FissError
 
 SAMPLES_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "samples")
 

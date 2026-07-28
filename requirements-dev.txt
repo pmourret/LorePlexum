@@ -1,0 +1,7 @@
+# Dépendances de développement — non installées dans l'image de production.
+#   python -m pip install -r requirements.txt -r requirements-dev.txt
+-r requirements.txt
+
+pytest==8.3.4
+# Client HTTP requis par fastapi.testclient (TestClient s'appuie dessus).
+httpx==0.28.1
