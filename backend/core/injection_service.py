@@ -16,12 +16,12 @@ import os
 from dataclasses import dataclass, field
 from typing import Optional
 
-from src.Reporter import Reporter
-from src.JSONInjector import JSONInjector
-from src.XMLInjector import XMLInjector
-from src.PDFExtractor import PDFGenerator
-from src.EnvLoader import EnvLoader
-from src.Database import InjectionDatabase, compute_text_hash
+from backend.core.reporter import Reporter
+from backend.core.json_injector import JSONInjector
+from backend.core.xml_injector import XMLInjector
+from backend.core.pdf_extractor import PDFGenerator
+from backend.core.env_loader import EnvLoader
+from backend.core.database import InjectionDatabase, compute_text_hash
 
 
 # Correspondance catégorie -> fichier XML TakeNotes (déplacée hors du CLI).

@@ -14,6 +14,82 @@ Catégories utilisées : **Ajouté**, **Modifié**, **Corrigé**, **Supprimé**,
 ## [Non publié]
 
 ### Ajouté
+- **Refactor backend/frontend — phase 1 : un backend structuré et une API JSON.**
+  Première des trois phases d'une migration en *strangler* vers un backend et un
+  frontend déployables séparément. L'application reste utilisable de bout en bout
+  à chaque étape : l'interface HTMX existante n'a rien perdu.
+  - **API JSON versionnée `/api/v1`**, documentée sur `/api/docs` (OpenAPI sur
+    `/api/openapi.json`) : santé, catégories, arcs, métadonnées, calendrier,
+    injections (création, historique paginé, détail, PDF), carte des touches,
+    paramètres. Les schémas Pydantic (`backend/app/schemas/`) sont la **seule**
+    source du contrat — le client TypeScript de la phase 2 en sera généré.
+  - Un **doublon** répond désormais `409 Conflict` avec le corps complet (journal
+    d'exécution + injection existante) plutôt qu'un `200` portant `success: false` ;
+    on force en rejouant le `POST` avec `allow_duplicate: true`.
+  - Une **configuration invalide** répond `503` et non `500` : le service va bien,
+    c'est son environnement qui ne va pas, et le client doit renvoyer vers la page
+    Paramètres. `/api/v1/health` reste joignable dans ce cas — il ne dépend pas du
+    service — pour que le frontend puisse diagnostiquer au lieu d'afficher une
+    page blanche.
+  - `GET /api/v1/calendar` renvoie **tout** le calendrier tamrielien en un appel, et
+    `GET /api/v1/keymap` **tout** l'état de la carte des touches. Les allers-retours
+    HTMX `/suggest-date`, `/date-days` et le rechargement du clavier à chaque
+    édition de touche n'ont plus lieu d'être côté client.
+- **Tests de l'orchestrateur et du contrat d'API** (`tests/test_injection_service.py`,
+  `tests/test_api_*.py`, `tests/test_legacy_ui.py`, fixtures dans
+  `tests/conftest.py`). `InjectionService` n'était couvert par aucun test alors
+  qu'il porte l'invariant le plus important du projet — **le JSON n'est écrit
+  qu'après le succès de l'injection XML** — qui est désormais verrouillé.
+  Chaque test monte un environnement applicatif jetable ; aucune donnée réelle
+  n'est touchée. La suite passe de 33 à 96 tests.
+- `requirements-dev.txt` : dépendances de test, exclues de l'image de production.
+
+### Modifié
+- **`src/` devient `backend/core/`**, modules renommés en `snake_case` (PEP 8) —
+  `InjectionService.py` → `injection_service.py`, etc. Aucun changement de logique.
+- **Nouveau point d'entrée ASGI : `backend.app.main:app`** (au lieu de
+  `webapp.main:app`). `Dockerfile` et `run_web.ps1` mis à jour.
+- **Les singletons de module disparaissent au profit de `Depends`.**
+  `webapp/main.py` (418 lignes) créait ses bases de données à l'import et
+  reconstruisait la configuration à chaque requête via un `build_service()` global :
+  rien n'était surchargeable, donc rien n'était testable sans toucher au vrai `.env`
+  ni aux vraies bases. Tout passe désormais par `backend/app/deps.py`.
+- **Réglages de déploiement typés** (`backend/app/config.py`, `pydantic-settings`),
+  distingués des réglages applicatifs éditables : les premiers sont fixés au
+  démarrage et mis en cache, les seconds sont relus à chaque requête puisque la
+  page Paramètres peut les changer à chaud.
+- `webapp/main.py` devient `webapp/ui.py` et passe de `FastAPI()` à `APIRouter` :
+  l'API et l'UI vivent sur une seule application. Son retrait, une fois la SPA en
+  place, sera une ligne à supprimer dans `create_app()`.
+- Une **famille de touches inconnue** est maintenant refusée (`422`) au lieu d'être
+  ignorée silencieusement : le formulaire semblait accepté alors que rien n'était
+  écrit en base.
+- L'historique et le détail n'exposent plus `pdf_path` en liste ; un booléen
+  `has_pdf` suffit, le téléchargement passe par `/api/v1/injections/{id}/pdf`.
+
+### Corrigé
+- **La page Paramètres déclarait invalide une installation Docker correcte.**
+  La validation ne lisait que le fichier `.env` — or en conteneur la configuration
+  arrive par variables d'environnement (`env_file:` du compose) et le `.env` est
+  exclu de l'image par `.dockerignore`. Tous les champs requis apparaissaient donc
+  « Requis mais vide », le bandeau « Configuration incomplète » s'affichait et le
+  bouton **Injecter était désactivé**. La validation lit désormais la configuration
+  *effective* — variables d'environnement puis fichier, dans l'ordre de priorité que
+  `EnvLoader` applique réellement.
+- **Les paramètres saisis depuis l'interface étaient perdus à chaque rebuild.**
+  L'écriture visait `<racine>/.env`, c'est-à-dire la couche d'image Docker. Le
+  chemin est maintenant réglable via `CONFIG_ENV_PATH`, à pointer sur le volume
+  persistant (`/data/app.env`) — `make check` le vérifie en pré-vol.
+- `PUT /api/v1/settings` n'écrit que les clés déclarées : une requête ne peut pas
+  injecter une variable arbitraire dans le fichier de configuration.
+
+### Supprimé
+- **L'interface en ligne de commande**, dépréciée depuis la 0.3.0 : `Main.py`,
+  `src/LorePlexum.py`, `src/ShellPrinter.py`, `src/DataExtractor.py`,
+  `run_tnfc.ps1`. Le pipeline reste identique, seul l'adaptateur console disparaît.
+- `webapp/settings.py`, remplacé par `backend/app/env_file.py`.
+
+### Ajouté
 - **Makefile de déploiement** (`deploy/Makefile`) : enveloppe les commandes de
   `DEPLOYMENT.md` (`make init` / `check` / `up` / `deploy` / `recreate` / `logs` /
   `shell` / `backup`), sans ajouter d'étape — les `docker compose` restent

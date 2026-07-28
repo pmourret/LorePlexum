@@ -1,58 +1,69 @@
-"""Application web FastAPI (interface de TNFCDataInjector).
+"""Ancienne interface HTMX — **en sursis**.
 
-Sert un formulaire d'injection, une page d'historique (archivage SQLite) et une
-page de paramètres. Toute la logique métier vit dans src/InjectionService : ces
-routes ne font que collecter les entrées du formulaire, appeler le service et
-rendre le résultat. HTMX gère l'interactivité (soumission sans rechargement,
-confirmation de doublon, filtres d'historique) sans framework JS.
+Conservée le temps de la phase 2 du refactor, pendant laquelle la SPA React reprend
+les pages une par une. Chaque page migrée retire les routes correspondantes d'ici ;
+quand il ne reste rien, `webapp/` disparaît et `create_app(legacy_ui=False)` devient
+le défaut.
+
+N'ajoutez **rien** ici : toute évolution fonctionnelle va dans `backend/app/routers/`
+et dans le frontend. Ce module a été converti de `FastAPI()` en `APIRouter` pour que
+l'API et l'UI vivent sur une seule application, et il ne construit plus ses propres
+bases de données : il consomme les dépendances de `backend.app.deps`, comme l'API.
 """
 
 import os
 import json
 
-from fastapi import FastAPI, Request, Form
+from fastapi import APIRouter, FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from src.Reporter import Reporter
-from src.Database import InjectionDatabase
-from src.KeyBinds import KeyBindDatabase
-from src.InjectionService import InjectionService, InjectionRequest, XML_FILES_MAPPING
-from src.EnvLoader import EnvLoader
-from src.FileChooser import FileChooser
-from src import TamrielicCalendar as calendar
-from src import KeyboardLayout as keyboard
-from webapp import settings as settings_module
+from backend.app import env_file
+from backend.app.config import get_deployment_settings
+from backend.app.deps import Db, KeysDb, get_db, get_reporter, get_service
+from backend.core.injection_service import InjectionRequest, XML_FILES_MAPPING
+from backend.core.files import FileChooser
+from backend.core import tamrielic_calendar as calendar
+from backend.core import keyboard_layout as keyboard
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-app = FastAPI(title="TNFCDataInjector — Abyssiaelle")
-app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
+router = APIRouter(include_in_schema=False)
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
-# Base d'archivage partagée par toutes les requêtes (connexion ouverte par appel).
-db = InjectionDatabase()
-# Base de la carte des touches (indépendante de l'archivage narratif).
-keys_db = KeyBindDatabase()
+
+def mount_legacy_ui(app: FastAPI) -> None:
+    """Attache les pages HTMX et leurs assets à l'application principale."""
+    app.mount(
+        "/static",
+        StaticFiles(directory=os.path.join(BASE_DIR, "static")),
+        name="static",
+    )
+    app.include_router(router)
 
 
-def build_service(reporter=None):
-    """Instancie le service à partir du .env courant.
+def _config_env_path():
+    return get_deployment_settings().config_env_path
 
-    Peut lever si la configuration est invalide (chemins manquants) : les routes
-    attrapent et redirigent l'utilisateur vers la page Paramètres.
+
+def build_service(reporter=None, db=None):
+    """Instancie le service comme le fait l'API, hors du système de `Depends`.
+
+    Les pages HTMX appellent le service en dehors du cycle de dépendances (dans des
+    `try` de pré-vol), d'où ce passe-plat vers `deps.get_service`.
     """
-    env = EnvLoader()
-    return InjectionService(
-        env.get_paths(), pdf_export_file=env.pdf_export_file,
-        reporter=reporter or Reporter(), db=db,
+    settings = get_deployment_settings()
+    return get_service(
+        settings,
+        db if db is not None else get_db(settings),
+        reporter if reporter is not None else get_reporter(),
     )
 
 
 def config_error():
     """Retourne le message d'erreur de config, ou None si tout est valide."""
-    ok, _ = settings_module.validate_settings()
+    ok, _ = env_file.validate_settings(_config_env_path())
     if ok:
         return None
     return "Configuration incomplète ou invalide. Renseignez les chemins dans Paramètres."
@@ -93,14 +104,14 @@ def _assemble_date(date_era, date_year, date_month, date_day):
 
 # --- Accueil -------------------------------------------------------------------
 
-@app.get("/", response_class=HTMLResponse)
+@router.get("/", response_class=HTMLResponse)
 def index():
     return RedirectResponse(url="/inject")
 
 
 # --- Injection -----------------------------------------------------------------
 
-@app.get("/inject", response_class=HTMLResponse)
+@router.get("/inject", response_class=HTMLResponse)
 def inject_form(request: Request):
     err = config_error()
     categories = list(XML_FILES_MAPPING.keys())
@@ -120,7 +131,7 @@ def inject_form(request: Request):
     })
 
 
-@app.get("/suggest-date", response_class=HTMLResponse)
+@router.get("/suggest-date", response_class=HTMLResponse)
 def suggest_date(request: Request, category: str):
     """Renvoie le champ date pré-rempli avec la dernière date connue de la catégorie.
 
@@ -136,7 +147,7 @@ def suggest_date(request: Request, category: str):
     })
 
 
-@app.get("/date-days", response_class=HTMLResponse)
+@router.get("/date-days", response_class=HTMLResponse)
 def date_days(request: Request, date_month: int = 0, date_day: int = 1):
     """Renvoie le menu « jour » ajusté au mois choisi (28 à 31 jours).
 
@@ -152,7 +163,7 @@ def date_days(request: Request, date_month: int = 0, date_day: int = 1):
     })
 
 
-@app.post("/inject", response_class=HTMLResponse)
+@router.post("/inject", response_class=HTMLResponse)
 def inject_submit(
     request: Request,
     category: str = Form(...),
@@ -169,7 +180,7 @@ def inject_submit(
     allow_duplicate: str = Form(""),
 ):
     """Exécute une injection et renvoie le fragment de résultat (HTMX)."""
-    reporter = Reporter()
+    reporter = get_reporter()
 
     err = config_error()
     if err:
@@ -224,8 +235,8 @@ def inject_submit(
 
 # --- Historique ----------------------------------------------------------------
 
-@app.get("/history", response_class=HTMLResponse)
-def history(request: Request, categorie: str = "", arc: str = "",
+@router.get("/history", response_class=HTMLResponse)
+def history(request: Request, db: Db, categorie: str = "", arc: str = "",
             search: str = "", page: int = 1):
     per_page = 20
     page = max(1, page)
@@ -253,8 +264,8 @@ def history(request: Request, categorie: str = "", arc: str = "",
     return templates.TemplateResponse("history.html", ctx)
 
 
-@app.get("/injection/{injection_id}", response_class=HTMLResponse)
-def injection_detail(request: Request, injection_id: int):
+@router.get("/injection/{injection_id}", response_class=HTMLResponse)
+def injection_detail(request: Request, injection_id: int, db: Db):
     item = db.get_injection(injection_id)
     metadata_pretty = ""
     if item and item.get("metadata_json"):
@@ -270,8 +281,8 @@ def injection_detail(request: Request, injection_id: int):
     })
 
 
-@app.get("/pdf/{injection_id}")
-def download_pdf(injection_id: int):
+@router.get("/pdf/{injection_id}")
+def download_pdf(injection_id: int, db: Db):
     """Télécharge le PDF associé à une injection s'il existe encore sur disque."""
     item = db.get_injection(injection_id)
     if item and item.get("pdf_path") and os.path.isfile(item["pdf_path"]):
@@ -281,7 +292,7 @@ def download_pdf(injection_id: int):
 
 # --- Carte des touches ---------------------------------------------------------
 
-def _keymap_context(request, close_editor=False):
+def _keymap_context(request, keys_db, close_editor=False):
     """Contexte complet du partiel `_keyboard.html` (clavier, souris, légende).
 
     `close_editor` déclenche le swap hors-cible qui referme le panneau d'édition
@@ -305,15 +316,15 @@ def _keymap_context(request, close_editor=False):
     }
 
 
-@app.get("/keys", response_class=HTMLResponse)
-def keys_page(request: Request):
+@router.get("/keys", response_class=HTMLResponse)
+def keys_page(request: Request, keys_db: KeysDb):
     return templates.TemplateResponse("keys.html", {
-        **_keymap_context(request), "active": "keys",
+        **_keymap_context(request, keys_db), "active": "keys",
     })
 
 
-@app.get("/keys/export")
-def keys_export():
+@router.get("/keys/export")
+def keys_export(keys_db: KeysDb):
     """Télécharge la carte complète en JSON (sauvegarde / partage)."""
     return JSONResponse(
         keys_db.export_payload(),
@@ -321,8 +332,8 @@ def keys_export():
     )
 
 
-@app.get("/keys/{code}/edit", response_class=HTMLResponse)
-def key_editor(request: Request, code: int):
+@router.get("/keys/{code}/edit", response_class=HTMLResponse)
+def key_editor(request: Request, code: int, keys_db: KeysDb):
     """Panneau d'édition d'une touche (fragment HTMX)."""
     return templates.TemplateResponse("_key_editor.html", {
         "request": request,
@@ -335,8 +346,8 @@ def key_editor(request: Request, code: int):
     })
 
 
-@app.post("/keys/{code}", response_class=HTMLResponse)
-def key_save(request: Request, code: int,
+@router.post("/keys/{code}", response_class=HTMLResponse)
+def key_save(request: Request, code: int, keys_db: KeysDb,
              action: str = Form(""), cat: str = Form(""), note: str = Form("")):
     """Assigne une touche, puis renvoie la carte à jour.
 
@@ -348,35 +359,35 @@ def key_save(request: Request, code: int,
     elif cat in keyboard.CATEGORIES:
         keys_db.set_bind(code, action, cat, note)
     return templates.TemplateResponse(
-        "_keyboard.html", _keymap_context(request, close_editor=True)
+        "_keyboard.html", _keymap_context(request, keys_db, close_editor=True)
     )
 
 
-@app.post("/keys/{code}/clear", response_class=HTMLResponse)
-def key_clear(request: Request, code: int):
+@router.post("/keys/{code}/clear", response_class=HTMLResponse)
+def key_clear(request: Request, code: int, keys_db: KeysDb):
     """Libère une touche, puis renvoie la carte à jour."""
     keys_db.clear_bind(code)
     return templates.TemplateResponse(
-        "_keyboard.html", _keymap_context(request, close_editor=True)
+        "_keyboard.html", _keymap_context(request, keys_db, close_editor=True)
     )
 
 
 # --- Paramètres ----------------------------------------------------------------
 
-@app.get("/settings", response_class=HTMLResponse)
+@router.get("/settings", response_class=HTMLResponse)
 def settings_form(request: Request, saved: str = ""):
-    ok, checks = settings_module.validate_settings()
+    ok, checks = env_file.validate_settings(_config_env_path())
     return templates.TemplateResponse("settings.html", {
         "request": request, "active": "settings",
         "checks": checks, "all_ok": ok, "saved": bool(saved),
     })
 
 
-@app.post("/settings", response_class=HTMLResponse)
+@router.post("/settings", response_class=HTMLResponse)
 async def settings_save(request: Request):
     form = await request.form()
-    values = {key: form.get(key, "") for key, *_ in settings_module.FIELDS}
-    settings_module.save_settings(values)
+    values = {key: form.get(key, "") for key in env_file.FIELD_KEYS}
+    env_file.save_settings(_config_env_path(), values)
     return RedirectResponse(url="/settings?saved=1", status_code=303)
 
 

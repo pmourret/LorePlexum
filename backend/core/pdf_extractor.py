@@ -4,8 +4,8 @@ from collections import defaultdict
 import os
 import unicodedata
 
-from src.FissDocument import FissDocument, FissError
-from src.Reporter import Reporter
+from backend.core.fiss_document import FissDocument, FissError
+from backend.core.reporter import Reporter
 
 
 class PDFGenerator:

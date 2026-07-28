@@ -22,5 +22,8 @@ deploy/.env
 
 # Doc et scripts propres au poste Windows.
 run_web.ps1
-run_tnfc.ps1
 *.md
+
+# Tests : pytest n'est pas installé dans l'image.
+/tests/
+requirements-dev.txt

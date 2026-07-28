@@ -55,10 +55,10 @@ check: ## Vérifie les prérequis avant déploiement (montage, réseau, variable
 		for v in FULL_CONTEXT_JSON_PATH ENTRIES_DIR TAKE_NOTES_EXPORT_DIR; do \
 			grep -q "^$$v=.\+" app.env || { echo "  ✗ $$v vide dans app.env"; ok=1; }; \
 		done; \
-		for v in DATABASE_PATH KEYBINDS_DB_PATH; do \
+		for v in DATABASE_PATH KEYBINDS_DB_PATH CONFIG_ENV_PATH; do \
 			grep -q "^$$v=/data/" app.env \
 				|| { echo "  ✗ $$v absent ou hors de /data dans app.env :"; \
-				     echo "      la base serait créée dans l'image et perdue au prochain build"; ok=1; }; \
+				     echo "      le fichier serait créé dans l'image et perdu au prochain build"; ok=1; }; \
 		done; \
 	fi; \
 	mountpoint -q $(MOUNT) 2>/dev/null \

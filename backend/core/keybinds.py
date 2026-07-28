@@ -14,7 +14,7 @@ import os
 import sqlite3
 from datetime import datetime
 
-from src.KeyboardLayout import DEFAULT_BINDS
+from backend.core.keyboard_layout import DEFAULT_BINDS
 
 _COLUMNS = ["scan_code", "action", "cat", "note", "updated_at"]
 

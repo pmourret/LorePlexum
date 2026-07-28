@@ -1,7 +1,7 @@
 import os
 import json
 
-from src.Reporter import Reporter
+from backend.core.reporter import Reporter
 
 
 class JSONInjector:

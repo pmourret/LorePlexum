@@ -9,8 +9,8 @@ import shutil
 import tempfile
 import unittest
 
-from src.FissDocument import FissDocument
-from src.XMLInjector import XMLInjector
+from backend.core.fiss_document import FissDocument
+from backend.core.xml_injector import XMLInjector
 
 SAMPLES_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "samples")
 
@@ -79,7 +79,7 @@ class XMLInjectorTests(unittest.TestCase):
     def test_todo_entry_is_replaced_in_priority(self):
         # On sème une entrée TODO puis on vérifie qu'elle est remplacée, pas ajoutée.
         doc = self._load("ExportChapter3.xml")
-        from src.FissDocument import FissEntry
+        from backend.core.fiss_document import FissEntry
         doc.entries.append(FissEntry(date="Jour", text="TODO: à compléter"))
         doc.save(os.path.join(self.workdir, "ExportChapter3.xml"), backup=False)
 

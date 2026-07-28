@@ -1,8 +1,8 @@
 import os
 import textwrap
 
-from src.FissDocument import FissDocument, FissEntry, FissError
-from src.Reporter import Reporter
+from backend.core.fiss_document import FissDocument, FissEntry, FissError
+from backend.core.reporter import Reporter
 
 
 class XMLInjector:
