@@ -569,6 +569,12 @@ export interface components {
              * @default 1
              */
             width: number;
+            /**
+             * Height
+             * @description Hauteur en unités de keycap (« + » et Entrée du pavé numérique)
+             * @default 1
+             */
+            height: number;
         };
         /**
          * KeyBind

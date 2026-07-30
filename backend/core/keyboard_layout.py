@@ -41,8 +41,9 @@ def palette(cat):
 
 # --- Disposition AZERTY --------------------------------------------------------
 
-# Format d'une touche : (scan code, légende physique, largeur en unités).
-# La largeur est omise quand elle vaut 1 (voir `_expand`).
+# Format d'une touche : (scan code, légende physique, largeur, hauteur) en unités
+# de keycap. Largeur et hauteur sont omises quand elles valent 1 (voir `_expand`).
+# La hauteur ne sert qu'au pavé numérique — voir `_NUMPAD_RAW`.
 #
 # ATTENTION : les scan codes sont **positionnels** — ils décrivent l'emplacement
 # physique de la touche sur un clavier US, pas le caractère imprimé dessus en
@@ -63,7 +64,10 @@ _ROWS_RAW = [
      (21, "Y"), (22, "U"), (23, "I"), (24, "O"), (25, "P"), (26, "^"),
      (27, "$"), (28, "Entrée", 1.4)],
     # Rangée Q
-    [(58, "Verr", 1.8), (30, "Q"), (31, "S"), (32, "D"), (33, "F"), (34, "G"),
+    # « Verr Maj » et non « Verr » : le pavé numérique a désormais son propre
+    # verrou (69). Deux touches homonymes dans `LEGENDS`, c'est exactement
+    # l'ambiguïté que ce module existe pour supprimer.
+    [(58, "Verr Maj", 1.8), (30, "Q"), (31, "S"), (32, "D"), (33, "F"), (34, "G"),
      (35, "H"), (36, "J"), (37, "K"), (38, "L"), (39, "M"), (40, "ù"),
      (43, "*", 1.6)],
     # Rangée W
@@ -75,12 +79,26 @@ _ROWS_RAW = [
      (184, "AltGr", 1.3), (157, "Ctrl D", 1.5)],
 ]
 
-# Pavé numérique, grille 3×3 (les codes ne se suivent pas : 74 et 78 sont les
-# touches « - » et « + » du pavé, absentes de cette grille).
+# Pavé numérique complet, grille 4 colonnes × 5 rangées.
+#
+# Il n'y avait que le carré 3×3 des chiffres 1-9 : Verr Num, « / », « * », « - »,
+# « + », « 0 », « . » et l'Entrée du pavé n'étaient pas déclarées, donc invisibles
+# et impossibles à assigner — alors que ce sont des candidates de choix, presque
+# toutes libres sur un mapping Skyrim.
+#
+# Les codes ne se suivent pas et ne sont pas devinables : « / » est 181 (0xB5) et
+# non 74, l'Entrée du pavé est 156 (0x9C) et non 28 — c'est une touche distincte de
+# l'Entrée principale, un mod peut les lire séparément.
+#
+# Quatrième champ = hauteur en unités. « + » et « Entrée » couvrent deux rangées,
+# comme sur le pavé physique ; les rangées qu'elles traversent n'ont donc que trois
+# touches, et la grille CSS place le reste par elle-même.
 _NUMPAD_RAW = [
-    [(71, "7"), (72, "8"), (73, "9")],
+    [(69, "Verr Num"), (181, "/"), (55, "*"), (74, "-")],
+    [(71, "7"), (72, "8"), (73, "9"), (78, "+", 1, 2)],
     [(75, "4"), (76, "5"), (77, "6")],
-    [(79, "1"), (80, "2"), (81, "3")],
+    [(79, "1"), (80, "2"), (81, "3"), (156, "Entrée", 1, 2)],
+    [(82, "0", 2), (83, ".")],
 ]
 
 # Souris. Les deux boutons latéraux sont nommés par leur **position physique**
@@ -91,9 +109,14 @@ _MOUSE_SIDE_RAW = [(261, "Latéral haut", 2), (260, "Latéral bas", 2)]
 
 
 def _expand(row):
-    """Normalise une rangée en dicts {code, legend, width}, largeur 1 par défaut."""
+    """Normalise une rangée en dicts {code, legend, width, height}, 1 par défaut."""
     return [
-        {"code": k[0], "legend": k[1], "width": k[2] if len(k) > 2 else 1}
+        {
+            "code": k[0],
+            "legend": k[1],
+            "width": k[2] if len(k) > 2 else 1,
+            "height": k[3] if len(k) > 3 else 1,
+        }
         for k in row
     ]
 

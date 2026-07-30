@@ -159,12 +159,27 @@ main.content:focus, main.content:focus-visible { outline: none; }
 .content { max-width: 1100px; margin: 28px auto; padding: 0 24px; }
 @media (max-width: 480px) { .content { margin: 20px auto; padding: 0 16px; } }
 
-/* Pages qui ont besoin de toute la largeur (la carte des touches). La contrainte
-   est levée ici plutôt que contournée dans la page : un `margin-left: calc(50% -
-   50vw)` aurait marché, mais `100vw` inclut la barre de défilement et provoque
-   un débordement horizontal de quelques pixels — exactement ce qu'on cherche à
-   supprimer. */
-.content-wide { max-width: none; }
+/* Pages qui ont besoin de plus que les 1100 px courants (la carte des touches). La
+   contrainte est desserrée ici plutôt que contournée dans la page : un
+   `margin-left: calc(50% - 50vw)` aurait marché, mais `100vw` inclut la barre de
+   défilement et provoque un débordement horizontal de quelques pixels — exactement
+   ce qu'on cherche à supprimer.
+
+   Desserrée, et non levée. En `max-width: none`, le titre, l'introduction et la
+   barre de recherche se collaient au bord gauche de l'écran pendant que le clavier,
+   lui, est centré : sur un écran de 2560 px, près de 400 px séparaient le bord du
+   clavier de celui du texte qui le présente. 1840 px, c'est la largeur maximale que
+   la carte atteint (≈ 1780 px à 72 px l'unité) plus les marges de page : la page se
+   centre donc d'un bloc, et le clavier remplit presque tout ce bloc.
+
+   « Presque » : il reste au clavier quelques pixels de jeu, que son propre centrage
+   répartit de part et d'autre — 5 px à 2560, 22 px à 1440. Le décalage entre le bord
+   du titre et celui du clavier n'est donc pas nul, il est devenu optiquement
+   invisible. L'annuler tout à fait demanderait de dimensionner la page sur le
+   contenu (`width: fit-content`), ce qui ferait dépendre la largeur de la page de la
+   largeur intrinsèque d'un conteneur qui défile — et casserait le cas mobile, où
+   c'est précisément le débordement qui est voulu. */
+.content-wide { max-width: 1840px; }
 /* `2em` par défaut donnait 32 px, y compris sur un écran de 360 px de large où le
    titre passait sur trois lignes. */
 h1 {
@@ -512,18 +527,21 @@ code { background: #100d09; padding: 1px 6px; border-radius: 5px; color: var(--g
    Le diviseur vient de la disposition réelle, mesurée et non estimée :
 
      rangée la plus large  14,9 u  (chiffres : 13 touches + Retour 1,9)
-     pavé numérique         3,0 u
+     pavé numérique         4,0 u  (Verr Num / * -, depuis l'ajout des opérateurs)
      souris                 3,0 u
      ------------------------------
-     total                 20,9 u  + 17 gouttières (0,11 u) + 2 écarts de bloc (0,5 u)
-     largeur         = 23,77 u + 48 px de marges de page
+     total                 21,9 u  + 18 gouttières (0,11 u) + 2 écarts de bloc (0,5 u)
+     largeur         = 24,88 u + 48 px de marges de page
 
-   D'où le diviseur 24 (au-dessus de 23,77, donc du bon côté) et les 90 px
+   D'où le diviseur 25 (au-dessus de 24,88, donc du bon côté) et les 90 px
    retranchés, qui couvrent les marges et la barre de défilement — `100vw`
-   l'inclut. Vérifié de 768 à 1920 px : la carte tient toujours.
+   l'inclut. Le pavé étant passé de 3 à 4 unités, le diviseur est monté de 24 à 25 :
+   le laisser à 24 aurait fait déborder la carte d'une unité entière.
 
-   `overflow-x: auto` reste un filet de sécurité au-dessus de ~900 px, mais devient
-   le fonctionnement nominal en dessous — voir le plancher ci-dessous.
+   Le plafond est à 72 px, contre 52 avant. 52 px bridait la carte à ~1250 px : sur
+   un écran large elle flottait, minuscule, dans un tiers de la page. 72 px, c'est
+   la taille réelle d'un keycap (19 mm à 96 dpi) — au-delà, on n'agrandit plus une
+   carte, on la caricature.
 
    Le plancher était à 18 px. Conséquence non voulue : sur un téléphone (390 px),
    le clavier *tenait* — en keycaps de 18 px, dont les libellés tombaient à 8 px et
@@ -532,11 +550,10 @@ code { background: #100d09; padding: 1px 6px; border-radius: 5px; color: var(--g
    34 px les libellés restent déchiffrables et le bloc défile latéralement dans son
    propre cadre, sans jamais faire défiler la page. */
 .keymap-board {
-    --key-u: clamp(34px, calc((100vw - 90px) / 24), 52px);
-    --key-gap: clamp(3px, calc(var(--key-u) * 0.11), 5px);
+    --key-u: clamp(34px, calc((100vw - 90px) / 25), 72px);
+    --key-gap: clamp(3px, calc(var(--key-u) * 0.11), 7px);
     --key-h: calc(var(--key-u) * 1.08);
 
-    display: flex; align-items: flex-start; gap: calc(var(--key-u) * 0.5);
     overflow-x: auto;
     /* Même raison que `.table-wrap` : bloc conteneur des éléments absolus internes,
        pour qu'ils ne s'échappent pas du défilement local. */
@@ -544,14 +561,29 @@ code { background: #100d09; padding: 1px 6px; border-radius: 5px; color: var(--g
     /* Défilement au doigt franc, sans blocage à mi-course. */
     overscroll-behavior-x: contain;
     padding-bottom: 6px;    /* place pour la barre de défilement quand elle apparaît */
+
+    /* Centrage. Le contenu est une enveloppe de niveau inline, donc `text-align`
+       la centre quand elle tient et la laisse commencer au bord gauche quand elle
+       déborde. `justify-content: center` sur un conteneur qui défile ferait au
+       contraire sortir le début du contenu de la zone atteignable : on ne pourrait
+       plus revenir sur la touche Échap. */
+    text-align: center;
+}
+.keymap-boards {
+    display: inline-flex;
+    align-items: flex-start;
+    gap: calc(var(--key-u) * 0.5);
+    text-align: left;   /* seul le bloc est centré, pas les libellés qu'il contient */
 }
 .keymap-board:focus-visible { outline: 2px solid var(--gold); outline-offset: 4px; }
 
-/* Le défilement latéral du clavier n'est annoncé nulle part : sous ~900 px la
-   carte est plus large que l'écran, et rien ne le dit. Le seuil est celui où le
-   plancher de `--key-u` (34 px) prend le dessus sur le calcul de largeur. */
+/* Le défilement latéral du clavier n'est annoncé nulle part : rien ne dit que la
+   carte continue hors de l'écran. Le seuil n'est pas choisi au hasard — c'est la
+   largeur à laquelle le plancher de `--key-u` (34 px) prend le dessus sur le
+   calcul : 22,9 × 34 + 18 × 3,74 ≈ 846 px de carte contre `100vw - 48` de place,
+   soit un débordement en dessous de ~894 px. */
 .board-hint { display: none; }
-@media (max-width: 900px) {
+@media (max-width: 890px) {
     .board-hint { display: block; margin: -8px 0 12px; }
 }
 
@@ -565,6 +597,35 @@ code { background: #100d09; padding: 1px 6px; border-radius: 5px; color: var(--g
 .numpad, .mouse { padding-top: 26px; }
 .key-row { display: flex; gap: var(--key-gap); margin-bottom: var(--key-gap); }
 .mouse .key-row { justify-content: stretch; }
+
+/* --- Grille du pavé numérique -------------------------------------------------
+   Le clavier principal est en rangées flex ; le pavé ne peut pas l'être. « + » et
+   l'Entrée du pavé font deux rangées de haut, et une rangée flex ne sait pas
+   exprimer ça : une touche plus haute pousserait la rangée suivante au lieu de
+   s'imbriquer avec elle.
+
+   En grille, le placement automatique suffit — les touches arrivent dans l'ordre de
+   lecture, celles qui portent `grid-row: span 2` réservent la case du dessous, et
+   les rangées à trois touches se recalent d'elles-mêmes. Aucune position n'est
+   écrite à la main. */
+.numpad-grid {
+    display: grid;
+    grid-template-columns: repeat(4, var(--key-u));
+    grid-auto-rows: var(--key-h);
+    gap: var(--key-gap);
+}
+/* En grille, l'étendue de la touche est décrite par ses `span` : la largeur et la
+   hauteur calculées de la version flex ne s'appliquent plus, elle occupe sa case.
+   Les largeurs du pavé sont entières (« 0 » vaut 2), ce que `span` exige — c'est
+   pourquoi cette règle ne vaut que pour le pavé et pas pour le clavier, dont les
+   unités sont fractionnaires (Retour 1,9 ; Maj D 2,1). */
+.numpad-grid .keycap {
+    flex: initial;
+    width: auto;
+    height: auto;
+    grid-column: span var(--u);
+    grid-row: span var(--h);
+}
 
 /* --- Keycap --- */
 .keycap {
@@ -595,13 +656,16 @@ code { background: #100d09; padding: 1px 6px; border-radius: 5px; color: var(--g
 
 /* Les libellés suivent la taille de la touche : figés, ils débordaient dès que
    l'unité descendait sous ~40 px. */
+   Les plafonds suivent celui de `--key-u` : bloqués à 13 et 10 px, les libellés
+   flottaient au milieu de keycaps devenus deux fois plus grands — la carte était
+   plus large sans être plus lisible, alors que c'est la lisibilité qu'on cherche. */
 .cap-legend {
-    font-size: clamp(8px, calc(var(--key-u) * 0.26), 13px);
+    font-size: clamp(8px, calc(var(--key-u) * 0.26), 16px);
     line-height: 1.1;
     max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .cap-action {
-    font-size: clamp(6px, calc(var(--key-u) * 0.185), 10px);
+    font-size: clamp(6px, calc(var(--key-u) * 0.185), 12px);
     line-height: 1.15; opacity: .85;
     max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }

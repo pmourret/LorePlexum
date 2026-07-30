@@ -30,6 +30,10 @@ class Key(BaseModel):
     code: int = Field(description="Scan code DirectInput (positionnel, pas la lettre)")
     legend: str
     width: float = Field(default=1, description="Largeur en unités de keycap")
+    height: float = Field(
+        default=1,
+        description="Hauteur en unités de keycap (« + » et Entrée du pavé numérique)",
+    )
 
 
 class KeyBind(BaseModel):

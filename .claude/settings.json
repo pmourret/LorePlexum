@@ -87,7 +87,15 @@
       "Bash(curl -s -m 3 -o /dev/null -w \"preview now: %{http_code}\\\\n\" http://localhost:4176/)",
       "PowerShell(Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { $p = Get-Process -Id $_.OwningProcess; \"$\\($p.Id\\) $\\($p.ProcessName\\)\" })",
       "Bash(grep -vE \"^\\\\+\\\\s*/?\\\\*|^\\\\+\\\\s+[a-zé].*\\\\*/|^\\\\+$\")",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(docker run --rm loreplexum-frontend:verif sh -c ' *)",
+      "Bash(MSYS_NO_PATHCONV=1 docker exec lp-verif sh -c 'grep -o \"name=\\\\\"description\\\\\"\\\\|name=\\\\\"theme-color\\\\\"\\\\|name=\\\\\"color-scheme\\\\\"\\\\|<noscript>\" /usr/share/nginx/html/index.html | sed \"s/^/  /\"')",
+      "Bash(docker rm *)",
+      "Bash(docker rmi *)",
+      "Bash(./.venv/Scripts/python.exe -m pytest tests -q)",
+      "Bash(../.venv/Scripts/python.exe ../scripts/dump_openapi.py ./openapi.json)",
+      "Bash(npx openapi-typescript *)",
+      "Bash(rm -f _k.mjs _n.mjs)"
     ]
   }
 }

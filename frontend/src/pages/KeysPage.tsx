@@ -167,6 +167,7 @@ function Keyboard({
             '--edge': colors.edge,
             '--face': colors.face,
             '--u': key.width,
+            '--h': key.height,
           } as React.CSSProperties
         }
         title={
@@ -264,31 +265,37 @@ function Keyboard({
         role="region"
         aria-label="Disposition du clavier, du pavé numérique et de la souris"
       >
-        <div className="board keyboard">
-          {keymap.layout.rows.map((row, index) => (
-            <div className="key-row" key={index}>
-              {row.map(cap)}
-            </div>
-          ))}
-        </div>
+        {/* Enveloppe de niveau inline : c'est elle qui permet de centrer les trois
+            blocs dans le conteneur de défilement. Centrer directement avec
+            `justify-content` rendrait le début du clavier inatteignable dès qu'il
+            déborde — piège connu des conteneurs flex qui défilent. */}
+        <div className="keymap-boards">
+          <div className="board keyboard">
+            {keymap.layout.rows.map((row, index) => (
+              <div className="key-row" key={index}>
+                {row.map(cap)}
+              </div>
+            ))}
+          </div>
 
-        <div className="board numpad">
-          <div className="board-title">Pavé</div>
-          {keymap.layout.numpad.map((row, index) => (
-            <div className="key-row" key={index}>
-              {row.map(cap)}
-            </div>
-          ))}
-        </div>
+          <div className="board numpad">
+            <div className="board-title">Pavé</div>
+            {/* Grille, et non des rangées flex comme le clavier : « + » et
+                l'Entrée du pavé font deux rangées de haut. Les touches sont donc
+                aplaties en une seule liste et le placement automatique de CSS Grid
+                recale de lui-même les rangées qui n'ont que trois touches. */}
+            <div className="numpad-grid">{keymap.layout.numpad.flat().map(cap)}</div>
+          </div>
 
-        <div className="board mouse">
-          <div className="board-title">Souris</div>
-          <div className="key-row mouse-top">{keymap.layout.mouse_buttons.map(cap)}</div>
-          {keymap.layout.mouse_side.map((key) => (
-            <div className="key-row" key={key.code}>
-              {cap(key)}
-            </div>
-          ))}
+          <div className="board mouse">
+            <div className="board-title">Souris</div>
+            <div className="key-row mouse-top">{keymap.layout.mouse_buttons.map(cap)}</div>
+            {keymap.layout.mouse_side.map((key) => (
+              <div className="key-row" key={key.code}>
+                {cap(key)}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 

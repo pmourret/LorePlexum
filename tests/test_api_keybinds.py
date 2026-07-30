@@ -10,7 +10,7 @@ def test_keymap_returns_layout_categories_and_binds_in_one_call(client):
 
     layout = body["layout"]
     assert len(layout["rows"]) == 6
-    assert len(layout["numpad"]) == 3
+    assert len(layout["numpad"]) == 5
     assert len(layout["mouse_buttons"]) == 3
     assert len(layout["mouse_side"]) == 2
 
@@ -22,6 +22,36 @@ def test_keymap_returns_layout_categories_and_binds_in_one_call(client):
 
     assert [c["key"] for c in body["categories"]] == list(keyboard.CATEGORIES)
     assert all({"ink", "edge", "face"} <= c.keys() for c in body["categories"])
+
+
+def test_numpad_exposes_every_physical_key_with_its_own_scan_code(client):
+    """Le pavé numérique complet, y compris les opérateurs et l'Entrée du pavé.
+
+    Ces touches manquaient : invisibles dans la carte, donc impossibles à assigner.
+    Le test fige les codes parce qu'ils ne sont pas devinables — « / » est 181 et
+    non 74, et l'Entrée du pavé (156) est une touche distincte de l'Entrée
+    principale (28), qu'un mod peut lire séparément.
+    """
+    layout = client.get(f"{BASE}/keymap").json()["layout"]
+    numpad = {k["legend"]: k for row in layout["numpad"] for k in row}
+
+    assert {k["code"] for row in layout["numpad"] for k in row} == {
+        69, 181, 55, 74,      # Verr Num  /  *  -
+        71, 72, 73, 78,       # 7 8 9  +
+        75, 76, 77,           # 4 5 6
+        79, 80, 81, 156,      # 1 2 3  Entrée du pavé
+        82, 83,               # 0  .
+    }
+    # « + » et l'Entrée du pavé couvrent deux rangées, « 0 » deux colonnes.
+    assert (numpad["+"]["width"], numpad["+"]["height"]) == (1, 2)
+    assert (numpad["Entrée"]["width"], numpad["Entrée"]["height"]) == (1, 2)
+    assert (numpad["0"]["width"], numpad["0"]["height"]) == (2, 1)
+
+    # L'Entrée du pavé ne doit pas être confondue avec l'Entrée principale, ni les
+    # deux verrous entre eux : `legend_of` sert d'en-tête au panneau d'édition.
+    assert keyboard.legend_of(28) == "Entrée" and keyboard.legend_of(156) == "Entrée"
+    assert keyboard.legend_of(58) == "Verr Maj"
+    assert keyboard.legend_of(69) == "Verr Num"
 
 
 def test_keymap_is_seeded_with_the_default_mapping(client):
