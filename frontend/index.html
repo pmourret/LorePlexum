@@ -3,6 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Outil local d'injection narrative : archivage des entrées de journal, historique et carte des touches."
+    />
+    <!-- Accorde l'interface du navigateur (barre d'adresse mobile) au fond du
+         thème, pour ne pas coller un bandeau clair au-dessus d'une page sombre. -->
+    <meta name="theme-color" content="#14110d" />
+    <meta name="color-scheme" content="dark" />
     <title>Journal d'Abyssiaelle — LorePlexum</title>
     <link
       rel="icon"
@@ -11,6 +19,24 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Sans script, #root reste vide : une page blanche sans explication. -->
+    <noscript>
+      <div
+        style="
+          margin: 40px auto;
+          max-width: 620px;
+          padding: 16px 20px;
+          font-family: 'Segoe UI', system-ui, sans-serif;
+          color: #f0c3b9;
+          background: #241812;
+          border: 1px solid #6d332a;
+          border-radius: 10px;
+        "
+      >
+        Cette interface a besoin de JavaScript pour fonctionner. Active-le puis recharge la
+        page.
+      </div>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
 import { ApiError, api } from '../api/client'
@@ -10,9 +11,9 @@ export default function DetailPage() {
   const injection = useInjection(injectionId)
 
   const back = (
-    <p>
+    <p className="back-link">
       <Link className="btn small" to="/history">
-        ← Retour à l'historique
+        <span aria-hidden="true">←</span> Retour à l'historique
       </Link>
     </p>
   )
@@ -26,7 +27,13 @@ export default function DetailPage() {
     )
   }
 
-  if (injection.isPending) return <>{back}<Loading /></>
+  if (injection.isPending)
+    return (
+      <>
+        {back}
+        <Loading label={`Chargement de l'injection #${injectionId}…`} />
+      </>
+    )
 
   if (injection.error) {
     const notFound = injection.error instanceof ApiError && injection.error.status === 404
@@ -52,38 +59,27 @@ export default function DetailPage() {
       {back}
       <h1>Injection #{item.id}</h1>
 
-      <div className="card meta-grid">
-        <div>
-          <span className="k">Date d'injection</span>
-          {item.date_injection}
-        </div>
-        <div>
-          <span className="k">Catégorie</span>
-          <span className="tag">{item.categorie}</span>
-        </div>
-        <div>
-          <span className="k">Arc</span>
-          {item.arc}
-        </div>
-        <div>
-          <span className="k">N° d'entrée</span>#{item.entry_number}
-        </div>
-        <div>
-          <span className="k">Date de session</span>
-          {item.date_session}
-        </div>
-        <div>
-          <span className="k">Fichier XML</span>
-          {item.xml_file}
-        </div>
-      </div>
+      {/* `<dl>` et non des `<div>` : ce bloc est une liste d'étiquettes et de
+          valeurs. En `<div>`/`<span>`, rien ne liait « Arc » à sa valeur — lue à
+          voix haute, la carte donnait six libellés puis six valeurs en vrac. */}
+      <dl className="card meta-grid">
+        <Meta label="Date d'injection" value={item.date_injection} />
+        <Meta
+          label="Catégorie"
+          value={item.categorie ? <span className="tag">{item.categorie}</span> : null}
+        />
+        <Meta label="Arc" value={item.arc} />
+        <Meta label="N° d'entrée" value={item.entry_number ? `#${item.entry_number}` : null} />
+        <Meta label="Date de session" value={item.date_session} />
+        <Meta label="Fichier XML" value={item.xml_file} />
+      </dl>
 
       {item.has_pdf && (
-        <p>
+        <p className="detail-actions">
           {/* Téléchargement : un vrai lien, pas une navigation du routeur. */}
           <a className="btn small" href={api.pdfUrl(item.id)} download>
-            📄 Télécharger le PDF
-          </a>{' '}
+            <span aria-hidden="true">📄</span> Télécharger le PDF
+          </a>
           <span className="muted">{item.pdf_path}</span>
         </p>
       )}
@@ -101,9 +97,30 @@ export default function DetailPage() {
       {hasMetadata && (
         <>
           <h2>Métadonnées</h2>
-          <pre className="card code">{JSON.stringify(metadata, null, 2)}</pre>
+          {/* `tabIndex` : le bloc défile horizontalement sur un JSON large, ce qui
+              est inatteignable sans souris tant qu'il n'est pas focalisable. */}
+          <pre className="card code" tabIndex={0} role="region" aria-label="Métadonnées (JSON)">
+            {JSON.stringify(metadata, null, 2)}
+          </pre>
         </>
       )}
     </>
+  )
+}
+
+/**
+ * Une paire étiquette / valeur de la carte d'en-tête.
+ *
+ * Le `<div>` intermédiaire est ce qui fait de la paire une seule cellule de grille :
+ * un `<dt>` et un `<dd>` posés directement dans la grille occuperaient deux cases,
+ * et les colonnes se désaligneraient dès qu'une valeur passe sur deux lignes.
+ */
+function Meta({ label, value }: { label: string; value: ReactNode }) {
+  const empty = value === null || value === undefined || value === ''
+  return (
+    <div>
+      <dt className="k">{label}</dt>
+      <dd className={empty ? 'muted' : undefined}>{empty ? '—' : value}</dd>
+    </div>
   )
 }

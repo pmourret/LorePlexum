@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import {
@@ -18,7 +18,7 @@ import {
   useSuggestedDate,
 } from '../api/hooks'
 import DateField from '../components/DateField'
-import { Alert, ExecutionLog, Loading, QueryError } from '../components/ui'
+import { Alert, ButtonSpinner, ExecutionLog, Loading, QueryError } from '../components/ui'
 
 export default function InjectPage() {
   const health = useHealth()
@@ -115,7 +115,41 @@ export default function InjectPage() {
     if (payload) create.mutate(payload)
   }
 
-  if (categories.isPending || calendar.isPending) return <Loading />
+  /**
+   * Amène le panneau de résultat sous les yeux après un envoi.
+   *
+   * Sur une colonne (sous 861 px), le panneau se trouve après un formulaire de
+   * douze lignes de texte plus les métadonnées : on cliquait « Injecter » et rien
+   * ne se passait à l'écran, le journal apparaissant très en dessous de la ligne de
+   * flottaison. `scrollIntoView` seul ne suffit pas pour qui n'y voit pas, d'où le
+   * focus sur le panneau, annoncé par son titre.
+   */
+  const resultRef = useRef<HTMLDivElement>(null)
+  const settled = create.isSuccess || create.isError || Boolean(metadataError)
+  useEffect(() => {
+    if (!settled) return
+    resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    resultRef.current?.focus({ preventScroll: true })
+  }, [settled])
+
+  /**
+   * Toute retouche du formulaire efface le résultat précédent.
+   *
+   * Sans ça, l'avertissement de doublon restait affiché pendant qu'on modifiait le
+   * texte pour le corriger — il décrivait alors un texte qui n'existait plus, et
+   * « Injecter malgré tout » aurait renvoyé le nouveau contenu sous une alerte qui
+   * parlait de l'ancien.
+   */
+  function edited<T>(setter: (value: T) => void) {
+    return (value: T) => {
+      if (create.isSuccess || create.isError) create.reset()
+      setMetadataError(null)
+      setter(value)
+    }
+  }
+
+  if (categories.isPending || calendar.isPending)
+    return <Loading label="Chargement du formulaire…" />
 
   return (
     <>
@@ -131,7 +165,10 @@ export default function InjectPage() {
         >
           <label>
             Catégorie
-            <select value={category} onChange={(event) => setCategory(event.target.value)}>
+            <select
+              value={category}
+              onChange={(event) => edited(setCategory)(event.target.value)}
+            >
               {categories.data?.map((c) => (
                 <option key={c.key} value={c.key}>
                   {c.key}
@@ -146,19 +183,37 @@ export default function InjectPage() {
               rows={3}
               value={resume}
               placeholder="Bref résumé de l'entrée, une ou deux phrases…"
-              onChange={(event) => setResume(event.target.value)}
+              onChange={(event) => edited(setResume)(event.target.value)}
             />
           </label>
 
           <label>
-            Texte du journal <span className="req">*</span>
+            Texte du journal{' '}
+            {/* L'astérisque seule se lit « étoile » : le mot est là pour l'oreille,
+                le symbole pour l'œil. */}
+            <span className="req" aria-hidden="true">
+              *
+            </span>
+            <span className="sr-only">(obligatoire)</span>
             <textarea
               rows={12}
               value={text}
+              required
+              aria-describedby="texte-aide"
               placeholder="Corps complet du journal enrichi…"
-              onChange={(event) => setText(event.target.value)}
+              onChange={(event) => edited(setText)(event.target.value)}
             />
-            <small>Colle directement le texte : aucune balise à ajouter.</small>
+            <small id="texte-aide">
+              Colle directement le texte : aucune balise à ajouter.
+              {text.trim() !== '' && (
+                <>
+                  {' '}
+                  <span className="muted">
+                    {text.trim().length.toLocaleString('fr-FR')} caractères.
+                  </span>
+                </>
+              )}
+            </small>
           </label>
 
           <div className="row">
@@ -166,7 +221,7 @@ export default function InjectPage() {
               Arc existant
               <select
                 value={arcSelect}
-                onChange={(event) => setArcSelect(event.target.value)}
+                onChange={(event) => edited(setArcSelect)(event.target.value)}
                 disabled={Boolean(newArc.trim())}
               >
                 <option value="">— nouvel arc (auto) —</option>
@@ -176,6 +231,11 @@ export default function InjectPage() {
                   </option>
                 ))}
               </select>
+              {/* Le champ se grisait sans un mot d'explication : on ne savait pas si
+                  c'était la configuration ou la saisie voisine qui le désactivait. */}
+              {Boolean(newArc.trim()) && (
+                <small>Ignoré : un nouvel arc est saisi à droite.</small>
+              )}
             </label>
             <label>
               …ou nom d'un nouvel arc
@@ -183,7 +243,7 @@ export default function InjectPage() {
                 type="text"
                 value={newArc}
                 placeholder="ex. arc_prologue"
-                onChange={(event) => setNewArc(event.target.value)}
+                onChange={(event) => edited(setNewArc)(event.target.value)}
               />
             </label>
           </div>
@@ -202,7 +262,7 @@ export default function InjectPage() {
                 Métadonnées (fichier)
                 <select
                   value={metadataFile}
-                  onChange={(event) => setMetadataFile(event.target.value)}
+                  onChange={(event) => edited(setMetadataFile)(event.target.value)}
                 >
                   <option value="">— aucune / JSON ci-dessous —</option>
                   {metadataFiles.data?.map((file) => (
@@ -219,28 +279,54 @@ export default function InjectPage() {
                 rows={3}
                 value={metadataJson}
                 disabled={Boolean(metadataFile)}
+                aria-invalid={metadataError ? true : undefined}
                 placeholder='{"lieu": "Bordeciel", "emotion": "tension"}'
-                onChange={(event) => setMetadataJson(event.target.value)}
+                onChange={(event) => edited(setMetadataJson)(event.target.value)}
               />
+              {Boolean(metadataFile) && (
+                <small>Ignoré : un fichier de métadonnées est sélectionné ci-dessus.</small>
+              )}
             </label>
           </details>
 
-          <button
-            type="submit"
-            className="btn primary"
-            disabled={!configured || create.isPending || !text.trim()}
-          >
-            Injecter
-            {create.isPending && <span className="spinner" />}
-          </button>
+          <div className="submit-row">
+            <button
+              type="submit"
+              className="btn primary"
+              disabled={!configured || create.isPending || !text.trim()}
+            >
+              {create.isPending ? 'Injection…' : 'Injecter'}
+              {create.isPending && <ButtonSpinner />}
+            </button>
+            {/* Un bouton grisé sans motif est une impasse : l'utilisateur ne sait pas
+                s'il doit remplir un champ ou aller régler la configuration. */}
+            {!configured ? (
+              <small>
+                Configuration incomplète — l'injection est impossible.{' '}
+                <Link to="/settings">Ouvrir les paramètres</Link>.
+              </small>
+            ) : (
+              !text.trim() && <small>Le texte du journal est obligatoire.</small>
+            )}
+          </div>
         </form>
 
-        <div className="card result-panel">
-          <h2>Résultat</h2>
+        {/* `tabIndex={-1}` : cible du focus après un envoi (voir `resultRef`), sans
+            entrer dans l'ordre de tabulation du formulaire. */}
+        <div
+          className="card result-panel"
+          ref={resultRef}
+          tabIndex={-1}
+          aria-labelledby="resultat-titre"
+          aria-busy={create.isPending}
+        >
+          <h2 id="resultat-titre">Résultat</h2>
 
           {metadataError && <Alert level="error">{metadataError}</Alert>}
 
-          {!result && !create.error && !metadataError && (
+          {create.isPending && <Loading label="Injection en cours…" />}
+
+          {!result && !create.error && !metadataError && !create.isPending && (
             <p className="muted">Le journal d'exécution s'affichera ici après l'injection.</p>
           )}
 
@@ -257,17 +343,25 @@ export default function InjectPage() {
                   <span className="muted"> (archive #{create.data.injection_id})</span>
                 )}
               </Alert>
-              {create.data.has_pdf && create.data.injection_id && (
-                <p>
+              <div className="editor-actions">
+                {create.data.has_pdf && create.data.injection_id && (
                   <a
                     className="btn small"
                     href={api.pdfUrl(create.data.injection_id)}
                     download
                   >
-                    📄 Télécharger le PDF
+                    <span aria-hidden="true">📄</span> Télécharger le PDF
                   </a>
-                </p>
-              )}
+                )}
+                {/* Après une injection réussie, le geste suivant est presque toujours
+                    d'aller la relire dans l'archive. Il fallait passer par
+                    l'historique et la retrouver à la main. */}
+                {create.data.injection_id && (
+                  <Link className="btn small" to={`/injection/${create.data.injection_id}`}>
+                    Voir la fiche
+                  </Link>
+                )}
+              </div>
             </>
           )}
 

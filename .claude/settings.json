@@ -67,7 +67,27 @@
       "Bash(git merge --no-ff refactor/backend-frontend-split -m 'Merge : refactor backend/frontend *)",
       "Bash(git fetch *)",
       "Bash(env -u FULL_CONTEXT_JSON_PATH -u ENTRIES_DIR -u METADATAS_DIR -u TAKE_NOTES_EXPORT_DIR -u PDF_OUTPUT_PATH -u PDF_EXPORT_FILE -u MAX_TOKENS_PER_ENTRY DATABASE_PATH=__TRACKED_VAR__/injections.db KEYBINDS_DB_PATH=__TRACKED_VAR__/keybinds.db CONFIG_ENV_PATH=__TRACKED_VAR__/app.env python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8150)",
-      "Bash(BACKEND_URL=http://127.0.0.1:8150 npx vite preview --port 4180)"
+      "Bash(BACKEND_URL=http://127.0.0.1:8150 npx vite preview --port 4180)",
+      "Bash(npx playwright *)",
+      "Bash(python -c \"import playwright; print\\('py-playwright ok'\\)\")",
+      "Bash(npx tsc *)",
+      "Bash(./.venv/Scripts/python.exe -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000)",
+      "Bash(curl -s http://127.0.0.1:8000/api/v1/health)",
+      "Bash(npx vite *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://127.0.0.1:4173/)",
+      "Bash(curl -s http://127.0.0.1:4173/api/v1/health)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:4176/)",
+      "Bash(curl -s http://localhost:4176/api/v1/health)",
+      "Bash(node ./_diag.mjs)",
+      "Bash(taskkill //F //IM node.exe)",
+      "Bash(taskkill //F //FI \"WINDOWTITLE eq *uvicorn*\")",
+      "Bash(curl -s -m 3 -o /dev/null -w \"backend:%{http_code}\\\\n\" http://127.0.0.1:8000/api/v1/health)",
+      "Bash(powershell -NoProfile -Command 'Get-CimInstance Win32_Process -Filter \"Name='\\\\''python.exe'\\\\''\" | Where-Object { $_.CommandLine -like '\\\\''*uvicorn*'\\\\'' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force; '\\\\''stopped '\\\\'' + $_.ProcessId }')",
+      "Bash(curl -s -m 3 -o /dev/null -w \"backend now: %{http_code}\\\\n\" http://127.0.0.1:8000/api/v1/health)",
+      "Bash(curl -s -m 3 -o /dev/null -w \"preview now: %{http_code}\\\\n\" http://localhost:4176/)",
+      "PowerShell(Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { $p = Get-Process -Id $_.OwningProcess; \"$\\($p.Id\\) $\\($p.ProcessName\\)\" })",
+      "Bash(grep -vE \"^\\\\+\\\\s*/?\\\\*|^\\\\+\\\\s+[a-zé].*\\\\*/|^\\\\+$\")",
+      "Bash(node -e ' *)"
     ]
   }
 }

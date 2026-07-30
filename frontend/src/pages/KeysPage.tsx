@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { api, type Key, type KeyBind, type KeyCategory, type Keymap } from '../api/client'
 import { useClearKeybind, useKeymap, useSetKeybind } from '../api/hooks'
-import { Loading, QueryError } from '../components/ui'
+import { ButtonSpinner, Loading, QueryError } from '../components/ui'
 
 /**
  * Carte des touches.
@@ -18,7 +18,27 @@ export default function KeysPage() {
   const [filterCat, setFilterCat] = useState<string | null>(null)
   const [search, setSearch] = useState('')
 
-  if (keymap.isPending) return <Loading />
+  /**
+   * Touche depuis laquelle le panneau a été ouvert, pour y rendre le focus.
+   *
+   * Sans ça, fermer le panneau laissait le focus sur un bouton qui vient de
+   * disparaître : le navigateur le renvoie alors sur `<body>` et la tabulation
+   * suivante repartait du tout début de la page — après cent keycaps.
+   */
+  const opener = useRef<HTMLElement | null>(null)
+
+  function openEditor(scanCode: number, from: HTMLElement) {
+    opener.current = from
+    setEditing(scanCode)
+  }
+
+  function closeEditor() {
+    setEditing(null)
+    opener.current?.focus()
+    opener.current = null
+  }
+
+  if (keymap.isPending) return <Loading label="Chargement de la carte des touches…" />
   if (keymap.error) return <QueryError error={keymap.error} />
   if (!keymap.data) return null
 
@@ -27,7 +47,7 @@ export default function KeysPage() {
       <div className="keys-head">
         <h1>Carte des touches</h1>
         <a className="btn small" href={api.keybindsExportUrl()} download>
-          ⭳ Exporter en JSON
+          <span aria-hidden="true">⭳</span> Exporter en JSON
         </a>
       </div>
 
@@ -44,15 +64,21 @@ export default function KeysPage() {
           search={search}
           onSearch={setSearch}
           onFilter={setFilterCat}
-          onEdit={setEditing}
+          onEdit={openEditor}
         />
       </div>
 
       {editing !== null && (
+        // `key` : sans lui, React réutilise l'instance quand on clique une autre
+        // touche sans fermer le panneau. Or l'état du formulaire est initialisé au
+        // montage — l'en-tête affichait le nouveau scan code et les champs
+        // gardaient l'action de la touche précédente, prête à être enregistrée au
+        // mauvais endroit.
         <KeyEditor
+          key={editing}
           keymap={keymap.data}
           scanCode={editing}
-          onClose={() => setEditing(null)}
+          onClose={closeEditor}
         />
       )}
     </>
@@ -72,7 +98,7 @@ function Keyboard({
   search: string
   onSearch: (value: string) => void
   onFilter: (cat: string | null) => void
-  onEdit: (scanCode: number) => void
+  onEdit: (scanCode: number, from: HTMLElement) => void
 }) {
   const binds = useMemo(
     () => new Map(keymap.binds.map((bind) => [bind.scan_code, bind])),
@@ -100,11 +126,28 @@ function Keyboard({
 
   const filtering = Boolean(filterCat || needle)
 
+  /** Nombre de touches assignées qui passent les filtres — sert d'état vide. */
+  const hitCount = useMemo(
+    () => (filtering ? keymap.binds.filter((bind) => matches(bind.scan_code)).length : 0),
+    // `matches` est recalculée à chaque rendu ; ses entrées réelles sont celles-ci.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [keymap.binds, filterCat, needle, filtering],
+  )
+
+  const activeCat = filterCat ? palettes.get(filterCat) : undefined
+
   function cap(key: Key) {
     const bind = binds.get(key.code)
     const palette = bind ? palettes.get(bind.cat) : undefined
     const colors = palette ?? keymap.free_key
     const hit = matches(key.code)
+
+    // Le libellé physique est souvent un symbole (« ⇧ », « ↵ ») ou une abréviation :
+    // lu seul il ne veut rien dire. `aria-label` porte donc la phrase complète, et
+    // le contenu visible est masqué pour ne pas être annoncé deux fois.
+    const label = bind
+      ? `${key.legend} — ${bind.action} (${palette?.label ?? bind.cat}), scan code ${key.code}`
+      : `${key.legend} — touche libre, scan code ${key.code}`
 
     return (
       <button
@@ -131,10 +174,17 @@ function Keyboard({
             ? `${bind.action} — scan code ${key.code}`
             : `Touche libre — scan code ${key.code}`
         }
-        onClick={() => onEdit(key.code)}
+        aria-label={label}
+        onClick={(event) => onEdit(key.code, event.currentTarget)}
       >
-        <span className="cap-legend">{key.legend}</span>
-        {bind && <span className="cap-action">{bind.action}</span>}
+        <span className="cap-legend" aria-hidden="true">
+          {key.legend}
+        </span>
+        {bind && (
+          <span className="cap-action" aria-hidden="true">
+            {bind.action}
+          </span>
+        )}
       </button>
     )
   }
@@ -145,13 +195,49 @@ function Keyboard({
         <label className="grow">
           Chercher une action ou un mémo
           <input
-            type="text"
+            type="search"
             value={search}
             placeholder="ex. parade, MCM, esquive…"
             onChange={(event) => onSearch(event.target.value)}
           />
         </label>
-        {filtering && (
+        {/* Le bouton est toujours rendu, seulement désactivé : le faire
+            apparaître et disparaître décalait le champ de recherche à la
+            première frappe, sous le curseur de l'utilisateur. */}
+        <button
+          type="button"
+          className="btn small"
+          disabled={!filtering}
+          onClick={() => {
+            onFilter(null)
+            onSearch('')
+          }}
+        >
+          Effacer les filtres
+        </button>
+      </div>
+
+      {/* Résultat du filtrage annoncé à voix haute : visuellement l'information
+          est portée par l'estompage de cent touches, ce qui ne s'entend pas. */}
+      <p className="sr-only" role="status">
+        {filtering
+          ? `${hitCount} touche(s) correspondent aux filtres.`
+          : `${keymap.binds.length} touches assignées.`}
+      </p>
+
+      {filtering && hitCount === 0 && (
+        <p className="keymap-empty muted">
+          <span aria-hidden="true">🔍</span>
+          <span>
+            Aucune touche assignée ne correspond{' '}
+            {[
+              activeCat ? `à la famille « ${activeCat.label} »` : null,
+              needle ? `à « ${search.trim()} »` : null,
+            ]
+              .filter(Boolean)
+              .join(' ni ')}
+            .
+          </span>
           <button
             type="button"
             className="btn small"
@@ -160,12 +246,24 @@ function Keyboard({
               onSearch('')
             }}
           >
-            Effacer les filtres
+            Tout afficher
           </button>
-        )}
-      </div>
+        </p>
+      )}
 
-      <div className="keymap-board">
+      <small className="board-hint muted">
+        La carte est plus large que l'écran : elle défile latéralement.
+      </small>
+
+      {/* `tabIndex` + `role="region"` : sous 900 px le clavier défile de côté, et
+          cette zone de défilement est inatteignable au clavier sans être
+          focalisable. Même traitement que le tableau de l'historique. */}
+      <div
+        className="keymap-board"
+        tabIndex={0}
+        role="region"
+        aria-label="Disposition du clavier, du pavé numérique et de la souris"
+      >
         <div className="board keyboard">
           {keymap.layout.rows.map((row, index) => (
             <div className="key-row" key={index}>
@@ -194,30 +292,35 @@ function Keyboard({
         </div>
       </div>
 
-      {/* La légende devient un filtre : cliquer une famille isole ses touches. */}
-      <div className="legend">
+      {/* La légende devient un filtre : cliquer une famille isole ses touches.
+          En <button> et non en <span role="button"> : le rôle bricolé obligeait à
+          réimplémenter Entrée et Espace à la main, n'héritait ni de `disabled` ni
+          du focus natif, et se perdait dans un formulaire. */}
+      <div className="legend" aria-label="Familles d'assignation (filtre)" role="group">
         {keymap.categories.map((cat) => (
-          <span
+          <button
             key={cat.key}
+            type="button"
             className={`legend-item filterable ${filterCat === cat.key ? 'active' : ''}`}
             style={
               { '--ink': cat.ink, '--edge': cat.edge, '--face': cat.face } as React.CSSProperties
             }
-            role="button"
-            tabIndex={0}
+            // Un filtre est un interrupteur, pas une action ponctuelle : `aria-pressed`
+            // est ce qui fait annoncer « activé » / « désactivé » à chaque bascule.
+            aria-pressed={filterCat === cat.key}
             onClick={() => onFilter(filterCat === cat.key ? null : cat.key)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault()
-                onFilter(filterCat === cat.key ? null : cat.key)
-              }
-            }}
           >
-            <span className="legend-chip" />
+            <span className="legend-chip" aria-hidden="true" />
             {cat.label}
-            <span className="legend-count">{keymap.counts[cat.key] ?? 0}</span>
-          </span>
+            <span className="legend-count">
+              <span className="sr-only">— </span>
+              {keymap.counts[cat.key] ?? 0}
+              <span className="sr-only"> touches</span>
+            </span>
+          </button>
         ))}
+        {/* « Libre » n'est pas un filtre : aucune assignation à isoler. Il reste
+            un simple repère de légende. */}
         <span
           className="legend-item legend-free"
           style={
@@ -228,7 +331,7 @@ function Keyboard({
             } as React.CSSProperties
           }
         >
-          <span className="legend-chip" />
+          <span className="legend-chip" aria-hidden="true" />
           Libre
           <span className="legend-count">{keymap.free_count}</span>
         </span>
@@ -295,7 +398,15 @@ function KeyEditor({
   const busy = save.isPending || clear.isPending
 
   return (
-    <div className="key-editor">
+    // `role="dialog"` sans `aria-modal` : le panneau flotte au-dessus de la carte
+    // mais ne la bloque pas — cliquer une autre touche est un geste voulu. Le
+    // déclarer modal mentirait sur ce qui reste atteignable.
+    <div
+      className="key-editor"
+      role="dialog"
+      aria-labelledby="key-editor-title"
+      aria-busy={busy}
+    >
       <form
         ref={panelRef}
         className="key-editor-panel"
@@ -305,9 +416,13 @@ function KeyEditor({
         }}
       >
         <div className="editor-head">
-          <span className="editor-cap">{legend}</span>
+          <span className="editor-cap" aria-hidden="true">
+            {legend}
+          </span>
           <div>
-            <div className="editor-title">Assignation</div>
+            <div className="editor-title" id="key-editor-title">
+              Assignation — {legend}
+            </div>
             <div className="editor-code">
               scan code <code>{scanCode}</code>
             </div>
@@ -315,14 +430,19 @@ function KeyEditor({
           <button
             type="button"
             className="editor-close btn small"
+            aria-label="Fermer le panneau d'assignation (Échap)"
             title="Fermer (Échap)"
             onClick={onClose}
           >
-            ✕
+            <span aria-hidden="true">✕</span>
           </button>
         </div>
 
+        {/* Les deux mutations, pas seulement l'enregistrement : un échec de
+            « Libérer » ne remontait nulle part, le panneau restait simplement
+            ouvert sans explication. */}
         {save.error && <QueryError error={save.error} />}
+        {clear.error && <QueryError error={clear.error} />}
 
         <label>
           Action
@@ -334,10 +454,18 @@ function KeyEditor({
             placeholder="ex. Attaque puissante"
             onChange={(event) => setAction(event.target.value)}
           />
+          <small>
+            {bind
+              ? 'Vider ce champ puis valider libère la touche.'
+              : 'Laisser vide et valider ferme le panneau sans rien assigner.'}
+          </small>
         </label>
 
-        <div className="pill-block">
-          <span className="pill-legend">Famille</span>
+        {/* `<fieldset>`/`<legend>` et non `<div>`/`<span>` : c'est ce qui fait
+            annoncer « Famille, bouton radio 3 sur 8 » au lieu du seul libellé de la
+            pastille, sorti de tout contexte. */}
+        <fieldset className="pill-block">
+          <legend className="pill-legend">Famille</legend>
           <div className="pills">
             {keymap.categories.map((category: KeyCategory) => (
               <label
@@ -362,7 +490,7 @@ function KeyEditor({
               </label>
             ))}
           </div>
-        </div>
+        </fieldset>
 
         <label>
           Mémo
@@ -377,8 +505,8 @@ function KeyEditor({
 
         <div className="editor-actions">
           <button type="submit" className="btn primary" disabled={busy}>
-            Assigner
-            {busy && <span className="spinner" />}
+            {save.isPending ? 'Enregistrement…' : 'Assigner'}
+            {save.isPending && <ButtonSpinner />}
           </button>
           {bind && (
             <button
@@ -387,7 +515,8 @@ function KeyEditor({
               disabled={busy}
               onClick={() => clear.mutate(scanCode, { onSuccess: onClose })}
             >
-              Libérer
+              {clear.isPending ? 'Libération…' : 'Libérer'}
+              {clear.isPending && <ButtonSpinner dark />}
             </button>
           )}
         </div>

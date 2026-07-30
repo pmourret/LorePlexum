@@ -12,13 +12,26 @@
     --panel: #221d16;
     --panel-2: #2a241b;
     --border: #3a3225;
+    /* Contour des contrôles (champs, boutons, keycaps). Séparé de `--border`
+       parce que les deux ont des exigences différentes : une cloison décorative
+       peut rester discrète, la limite d'un champ de saisie est sa *seule*
+       affordance. `--border` plafonne à 1,5:1 contre le fond — le champ était
+       quasi invisible. Celui-ci tient 3:1 (WCAG 1.4.11) sur le fond de page,
+       le fond de champ et les cartes. */
+    --border-strong: #7a6c50;
     --ink: #e8dfce;
     --ink-soft: #b6ab93;
-    --muted: #8a8069;
+    /* Relevé de #8a8069 : ce ton ne passait 4,5:1 que sur le fond de page nu
+       (4,82), pas dans une carte (4,28) ni sur `--panel-2` (3,93) — or c'est
+       exactement là qu'il sert, en 11 à 13 px (`small`, `.k`, `.brand-sub`).
+       #9a8f76 tient 4,8:1 au pire des cas sans changer le registre. */
+    --muted: #9a8f76;
     --gold: #c9a24b;
     --gold-soft: #d9be7e;
     --green: #7fae6b;
-    --red: #cf6a5a;
+    /* Relevé de #cf6a5a, qui tombait à 4,43:1 sur le fond teinté de
+       `.setting.error` — l'endroit précis où ce rouge porte du texte. */
+    --red: #d5776a;
     --amber: #d7a24a;
     --blue: #6f9bc0;
     --radius: 10px;
@@ -38,12 +51,81 @@ body {
     background:
         radial-gradient(1200px 600px at 50% -200px, #2a2214 0%, transparent 60%),
         var(--bg);
+    background-attachment: fixed;   /* le halo reste en haut de page, pas en haut du flux */
     line-height: 1.55;
+    min-height: 100vh;
 }
 
-/* --- En-tête --- */
+/* --- Socle d'accessibilité ---------------------------------------------------
+   Un anneau de focus visible partout, une fois. Les navigateurs en fournissent
+   un par défaut, mais `outline: none` sur les champs (plus bas) et les fonds
+   sombres le rendaient inutilisable ou absent selon l'élément. `:focus-visible`
+   plutôt que `:focus` : le clic à la souris ne doit pas le déclencher.
+
+   Pas de `border-radius` ici : l'`outline` suit déjà l'arrondi propre de chaque
+   élément. En imposer un reviendrait à écraser celui des boutons et des pastilles
+   pendant qu'ils ont le focus — et ne pas le faire ne tiendrait qu'à l'ordre des
+   règles dans le fichier, ce qui n'est pas une garantie. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--gold);
+    outline-offset: 2px;
+}
+
+::selection { background: rgba(201, 162, 75, .3); color: var(--ink); }
+
+/* Lien d'évitement : la navigation compte quatre entrées, la carte des touches
+   en compte plus de cent. Sans ce raccourci, atteindre le contenu au clavier
+   depuis l'en-tête est déjà pénible, et impossible en pratique sur /keys. */
+.skip-link {
+    position: absolute; left: 8px; top: -60px; z-index: 100;
+    background: var(--panel-2); color: var(--gold-soft);
+    border: 1px solid var(--border-strong); border-radius: 8px;
+    padding: 10px 16px; font-size: 14px; text-decoration: none;
+    transition: top .15s;
+}
+.skip-link:focus { top: 8px; }
+
+/* `<main>` porte `tabindex="-1"` pour recevoir le focus au changement de route et
+   depuis le lien d'évitement. Il entre donc dans la règle ci-dessus, qui cerclait
+   la page entière d'un liseré doré. Ce n'est pas un contrôle : le repère visible,
+   c'est le titre de la page qui vient d'apparaître en haut. */
+main.content:focus, main.content:focus-visible { outline: none; }
+
+/* Animations : le spinner tourne indéfiniment. Pour qui a demandé moins de
+   mouvement, on garde l'indicateur mais on le fige — l'information « ça
+   travaille » passe par le texte qui l'accompagne, jamais par la rotation seule. */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* Réservé aux lecteurs d'écran : en-têtes de colonne sans libellé visible,
+   précisions qu'un voyant lit dans la mise en page.
+
+   Attention au `position: absolute` : sans ancêtre positionné, le bloc conteneur
+   d'un élément absolu est le viewport, pas le conteneur de défilement qui
+   l'entoure. Un `.sr-only` placé dans un tableau qui défile latéralement n'est
+   donc PAS rogné par ce tableau — il se pose à son emplacement statique (ici
+   ~950 px) et étire la largeur de défilement de la page entière. Tout conteneur
+   à `overflow-x` qui abrite un `.sr-only` doit être `position: relative`
+   (cf. `.table-wrap`). */
+.sr-only {
+    position: absolute; width: 1px; height: 1px;
+    padding: 0; margin: -1px; overflow: hidden;
+    clip-path: inset(50%); white-space: nowrap; border: 0;
+}
+
+/* --- En-tête ---
+   `flex-wrap` plutôt que `space-between` seul : en dessous de ~620 px, la marque
+   et quatre entrées de navigation ne tiennent pas sur une ligne. Sans repli, la
+   navigation débordait de l'écran et devenait inatteignable. */
 .topbar {
     display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 10px 16px;
     padding: 14px 28px;
     background: linear-gradient(180deg, var(--bg-2), var(--bg));
     border-bottom: 1px solid var(--border);
@@ -53,17 +135,29 @@ body {
 .sigil { font-size: 30px; filter: drop-shadow(0 0 6px rgba(201,162,75,.4)); }
 .brand-title { font-family: var(--serif); font-size: 20px; color: var(--gold-soft); letter-spacing: .3px; }
 .brand-sub { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 2px; }
-.nav { display: flex; gap: 6px; }
+.nav { display: flex; gap: 6px; flex-wrap: wrap; }
 .nav a {
     color: var(--ink-soft); text-decoration: none;
     padding: 8px 16px; border-radius: var(--radius); font-size: 14px;
     border: 1px solid transparent;
+    transition: background .15s, color .15s;
 }
 .nav a:hover { background: var(--panel); color: var(--ink); }
-.nav a.on { background: var(--panel-2); color: var(--gold-soft); border-color: var(--border); }
+/* L'onglet actif ne se signale plus par la seule couleur : un liseré doré porte
+   la même information sans dépendre de la perception des teintes. */
+.nav a.on {
+    background: var(--panel-2); color: var(--gold-soft);
+    border-color: var(--border-strong);
+    box-shadow: inset 0 -2px 0 var(--gold);
+}
+@media (max-width: 480px) {
+    .topbar { padding: 12px 16px; }
+    .nav a { padding: 8px 12px; }
+}
 
 /* --- Contenu --- */
 .content { max-width: 1100px; margin: 28px auto; padding: 0 24px; }
+@media (max-width: 480px) { .content { margin: 20px auto; padding: 0 16px; } }
 
 /* Pages qui ont besoin de toute la largeur (la carte des touches). La contrainte
    est levée ici plutôt que contournée dans la page : un `margin-left: calc(50% -
@@ -71,10 +165,19 @@ body {
    un débordement horizontal de quelques pixels — exactement ce qu'on cherche à
    supprimer. */
 .content-wide { max-width: none; }
-h1 { font-family: var(--serif); color: var(--gold-soft); font-weight: 600; margin: 0 0 20px; }
+/* `2em` par défaut donnait 32 px, y compris sur un écran de 360 px de large où le
+   titre passait sur trois lignes. */
+h1 {
+    font-family: var(--serif); color: var(--gold-soft); font-weight: 600;
+    font-size: clamp(23px, 4.5vw, 30px); line-height: 1.25;
+    margin: 0 0 20px;
+}
 h2 { font-family: var(--serif); color: var(--gold-soft); font-size: 18px; margin: 26px 0 10px; }
-h3 { font-size: 14px; color: var(--ink-soft); }
-.foot { text-align: center; color: var(--muted); font-size: 12px; padding: 30px; }
+h3 { font-size: 14px; color: var(--ink-soft); margin: 0; }
+.foot {
+    text-align: center; color: var(--muted); font-size: 12px; padding: 30px;
+    margin-top: 20px; border-top: 1px solid var(--border);
+}
 
 /* --- Cartes & grille --- */
 .card {
@@ -84,24 +187,108 @@ h3 { font-size: 14px; color: var(--ink-soft); }
     padding: 20px;
     box-shadow: 0 4px 18px rgba(0,0,0,.35);
 }
-.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; align-items: start; }
-@media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+/* `minmax(0, 1fr)` : un `<pre>` ou un mot très long dans une colonne la faisait
+   déborder du conteneur au lieu de la réduire. */
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; align-items: start; }
+@media (max-width: 860px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 480px) { .card { padding: 16px; } }
+
+/* Ligne d'envoi : bouton + motif du blocage éventuel. */
+.submit-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 20px; }
+.submit-row small { margin-top: 0; }
+.submit-row a { color: var(--gold-soft); }
+
+/* Le panneau de résultat reçoit le focus après un envoi (voir InjectPage) ; comme
+   `<main>`, ce n'est pas un contrôle et un liseré autour de la carte entière ne
+   dirait rien d'utile. Le titre annoncé fait le travail. */
+.result-panel:focus, .result-panel:focus-visible { outline: none; }
 
 /* --- Formulaires --- */
 label { display: block; margin: 14px 0; font-size: 13px; color: var(--ink-soft); }
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 @media (max-width: 620px) { .row { grid-template-columns: 1fr; } }
-input[type=text], input[type=number], select, textarea {
+/* `input[type=search]` fait partie de la liste : les champs de recherche
+   (historique, carte des touches) sont en `type=search` pour la croix
+   d'effacement native, et sans lui ils retombaient sur l'apparence par défaut
+   du navigateur — un champ blanc au milieu du thème sombre. */
+input[type=text], input[type=number], input[type=search], select, textarea {
     width: 100%; margin-top: 6px;
     background: #17130d; color: var(--ink);
-    border: 1px solid var(--border); border-radius: 8px;
+    /* `--border-strong` et non `--border` : le fond du champ (#17130d) est à
+       1,06:1 du fond de page, donc le contour est la seule chose qui dit « ici on
+       saisit ». À 1,5:1 il ne le disait pas. */
+    border: 1px solid var(--border-strong); border-radius: 8px;
     padding: 10px 12px; font-family: var(--sans); font-size: 14px;
+    /* `line-height` explicite : `<select>` et `<input>` n'ont pas la même hauteur
+       de ligne par défaut, ce qui les décalait de 2 px l'un de l'autre — visible
+       sur la ligne de filtres de l'historique et sur la grille de dates, où ils
+       se côtoient. */
+    line-height: 1.45;
+    transition: border-color .12s, box-shadow .12s;
 }
 textarea { resize: vertical; font-family: ui-monospace, "Cascadia Code", Consolas, monospace; }
+select { cursor: pointer; }
+/* La croix d'effacement de WebKit est noire sur noir sans ça. */
+input[type=search]::-webkit-search-cancel-button {
+    -webkit-appearance: none; appearance: none;
+    width: 14px; height: 14px; cursor: pointer;
+    background: var(--muted);
+    clip-path: polygon(20% 0, 50% 30%, 80% 0, 100% 20%, 70% 50%, 100% 80%, 80% 100%,
+                       50% 70%, 20% 100%, 0 80%, 30% 50%, 0 20%);
+}
+input[type=search]:hover::-webkit-search-cancel-button { background: var(--ink); }
+input:hover:not(:disabled), select:hover:not(:disabled), textarea:hover:not(:disabled) {
+    border-color: var(--gold-soft);
+}
+/* L'anneau doré porté par la bordure reste (il colore le champ lui-même, ce que
+   `outline` ne fait pas) ; l'`outline` global du socle s'y ajoute au clavier. */
 input:focus, select:focus, textarea:focus {
-    outline: none; border-color: var(--gold); box-shadow: 0 0 0 2px rgba(201,162,75,.18);
+    border-color: var(--gold); box-shadow: 0 0 0 2px rgba(201,162,75,.18);
+}
+/* Champ désactivé : l'état doit se voir sans avoir à cliquer dedans. Auparavant
+   un `<select>` grisé par la saisie d'un nouvel arc était identique à un actif. */
+input:disabled, select:disabled, textarea:disabled {
+    opacity: .55; cursor: not-allowed;
+    background: #131009; border-color: var(--border);
+}
+/* Champ signalé en erreur par la page (`aria-invalid`). Une seule règle, plutôt
+   qu'une classe à poser à la main sur chaque champ concerné. */
+input[aria-invalid='true'], select[aria-invalid='true'], textarea[aria-invalid='true'] {
+    border-color: var(--red);
+}
+input[aria-invalid='true']:focus, textarea[aria-invalid='true']:focus {
+    box-shadow: 0 0 0 2px rgba(213,119,106,.22);
 }
 small { display: block; margin-top: 5px; color: var(--muted); font-size: 12px; }
+
+/* --- Bloc dépliable (métadonnées facultatives) ---------------------------------
+   `<details>` était utilisé sans aucun style : triangle natif, aucun espacement,
+   rien qui le rattache au reste du formulaire. */
+.optional-block {
+    margin: 18px 0 4px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: rgba(0, 0, 0, .16);
+}
+.optional-block > summary {
+    cursor: pointer; list-style: none;
+    padding: 10px 14px; font-size: 13px; color: var(--ink-soft);
+    display: flex; align-items: center; gap: 9px;
+}
+.optional-block > summary::-webkit-details-marker { display: none; }
+/* Chevron maison : le triangle natif ne se colore pas et ne suit pas la teinte. */
+.optional-block > summary::before {
+    content: '▸'; color: var(--gold); font-size: 11px;
+    transition: transform .15s; flex: 0 0 auto;
+}
+.optional-block[open] > summary::before { transform: rotate(90deg); }
+.optional-block > summary:hover { color: var(--ink); }
+.optional-block[open] > summary { border-bottom: 1px solid var(--border); }
+/* Les enfants du `<details>` sauf le `<summary>` : il n'y a pas de wrapper
+   intermédiaire, on met donc la marge intérieure sur eux. */
+.optional-block > :not(summary) { margin-left: 14px; margin-right: 14px; }
+.optional-block > summary + * { margin-top: 12px; }
+.optional-block > :last-child { margin-bottom: 14px; }
 
 /* --- Champ date (calendrier tamrielien) --- */
 .date-block { margin: 14px 0; }
@@ -113,33 +300,53 @@ code { background: #100d09; padding: 1px 6px; border-radius: 5px; color: var(--g
 
 /* --- Boutons --- */
 .btn {
-    display: inline-flex; align-items: center; gap: 8px;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
     background: var(--panel-2); color: var(--ink);
-    border: 1px solid var(--border); border-radius: 8px;
+    border: 1px solid var(--border-strong); border-radius: 8px;
     padding: 9px 16px; font-size: 14px; cursor: pointer; text-decoration: none;
-    transition: transform .05s, background .15s;
+    /* Aucune taille de cible n'était garantie : `.btn.small` tombait à 24 px de
+       haut, sous le minimum confortable au doigt comme à la souris. */
+    min-height: 36px;
+    transition: transform .05s, background .15s, border-color .15s, filter .15s;
+    white-space: nowrap;
 }
-.btn:hover { background: #332b1f; }
-.btn:active { transform: translateY(1px); }
+.btn:hover:not(:disabled) { background: #332b1f; border-color: var(--gold-soft); }
+.btn:active:not(:disabled) { transform: translateY(1px); }
 .btn.primary { background: linear-gradient(180deg, var(--gold), #a9832f); color: #1a1408; border-color: #8a6c26; font-weight: 600; }
-.btn.primary:hover { filter: brightness(1.06); }
-.btn.danger { background: #4a241f; border-color: #6d332a; color: #f0c3b9; }
-.btn.small { padding: 5px 11px; font-size: 12px; }
+.btn.primary:hover:not(:disabled) { filter: brightness(1.06); background: linear-gradient(180deg, var(--gold), #a9832f); border-color: #8a6c26; }
+.btn.danger { background: #4a241f; border-color: #7d3d32; color: #f0c3b9; }
+.btn.danger:hover:not(:disabled) { background: #5a2b25; border-color: #9c4c3e; }
+.btn.small { padding: 5px 11px; font-size: 12px; min-height: 30px; }
+/* Un bouton inerte ne doit pas réagir au survol : il le faisait, ce qui promettait
+   un clic qui n'arrivait jamais. */
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 
-/* --- Alertes --- */
+/* --- Alertes ---
+   `align-items: flex-start` : sur un message long qui passe à la ligne, centrer
+   faisait flotter l'icône au milieu du paragraphe. */
 .alert { padding: 12px 16px; border-radius: 8px; margin: 14px 0; border: 1px solid; font-size: 14px;
-    display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+.alert > .alert-icon { flex: 0 0 auto; line-height: 1.55; }
+.alert > .alert-body { flex: 1 1 260px; min-width: 0; }
 .alert.success { background: rgba(127,174,107,.12); border-color: rgba(127,174,107,.4); color: #cfe6c2; }
 .alert.error   { background: rgba(207,106,90,.12);  border-color: rgba(207,106,90,.4);  color: #f0c3b9; }
 .alert.warning { background: rgba(215,162,74,.12);  border-color: rgba(215,162,74,.4);  color: #ecd4a0; }
 
 /* --- Panneau résultat + logs --- */
 .result-panel { min-height: 200px; }
+/* Le formulaire d'injection est long (12 lignes de texte, plus les métadonnées).
+   À deux colonnes, le panneau de résultat sortait par le haut pendant qu'on
+   relisait le bas du formulaire, et le journal d'exécution devenait invisible
+   juste après l'avoir déclenché. Empilé (une colonne), « collant » n'aurait aucun
+   sens : la règle est donc conditionnée au même seuil que `.grid`. */
+@media (min-width: 861px) {
+    .result-panel { position: sticky; top: 90px; max-height: calc(100vh - 120px); overflow-y: auto; }
+}
 .muted { color: var(--muted); }
 .logs-title { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 12px; }
 .logs { list-style: none; padding: 0; margin: 8px 0 0; font-size: 13px; }
-.log { display: flex; gap: 9px; padding: 5px 8px; border-radius: 6px; align-items: baseline; }
+.log { display: flex; gap: 9px; padding: 5px 8px; border-radius: 6px; align-items: baseline;
+    overflow-wrap: anywhere; }
 .log + .log { margin-top: 2px; }
 .log.error { background: rgba(207,106,90,.08); color: #eab8ae; }
 .log.success { color: #bcd9ab; }
@@ -166,38 +373,117 @@ code { background: #100d09; padding: 1px 6px; border-radius: 5px; color: var(--g
 .filters label { margin: 0; }
 .filters .grow { flex: 1; min-width: 180px; }
 
-/* --- Tableau --- */
+/* --- Tableau ---
+   Huit colonnes ne tiennent pas sous ~900 px. Le tableau défile donc dans son
+   propre conteneur au lieu d'élargir la page : c'est la différence entre « je
+   fais glisser la liste » et « toute l'interface part de côté et l'en-tête
+   collant ne suit pas ». `tabindex=0` côté page rend ce défilement atteignable
+   au clavier, sinon la zone est cadrée mais inaccessible sans souris. */
+.table-wrap {
+    overflow-x: auto;
+    /* Indispensable, pas décoratif : c'est ce qui fait de ce cadre le bloc
+       conteneur des `.sr-only` du tableau (en-tête « Actions », légende). Sans
+       lui, ces éléments absolus se calent sur le viewport, échappent au
+       défilement local et allongeaient la largeur de la page à ~960 px sur
+       mobile — le débordement horizontal que ce cadre est censé supprimer. */
+    position: relative;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    /* Ombres de défilement : sans elles, le tableau est simplement coupé net au
+       bord du cadre et rien ne dit qu'il reste des colonnes — sur mobile, les
+       trois dernières (résumé, date de session, actions) passaient inaperçues.
+
+       Deux paires de couches. Les voiles sont solidaires du cadre (`scroll`),
+       donc collés aux bords visibles. Les caches sont solidaires du contenu
+       (`local`) et reprennent exactement le fond : arrivé en butée, le cache se
+       superpose au voile et l'efface. D'où l'ordre — les caches d'abord, car la
+       première couche est celle du dessus. Aucun script, aucun écouteur de
+       défilement. */
+    background:
+        linear-gradient(180deg, var(--panel), var(--bg-2)) 0 0 / 26px 100% no-repeat local,
+        linear-gradient(180deg, var(--panel), var(--bg-2)) 100% 0 / 26px 100% no-repeat local,
+        linear-gradient(to right, rgba(0,0,0,.45), rgba(0,0,0,0)) 0 0 / 26px 100% no-repeat scroll,
+        linear-gradient(to left, rgba(0,0,0,.45), rgba(0,0,0,0)) 100% 0 / 26px 100% no-repeat scroll,
+        linear-gradient(180deg, var(--panel), var(--bg-2));
+}
+.table-wrap:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.table th { text-align: left; color: var(--muted); font-weight: 600; text-transform: uppercase;
-    font-size: 11px; letter-spacing: .5px; padding: 8px 10px; border-bottom: 1px solid var(--border); }
-.table td { padding: 9px 10px; border-bottom: 1px solid rgba(58,50,37,.5); vertical-align: top; }
-.table tr:hover td { background: rgba(201,162,75,.05); }
+.table thead th { text-align: left; color: var(--muted); font-weight: 600; text-transform: uppercase;
+    font-size: 11px; letter-spacing: .5px; padding: 10px 12px; border-bottom: 1px solid var(--border-strong);
+    white-space: nowrap; }
+.table td { padding: 9px 12px; border-bottom: 1px solid rgba(58,50,37,.5); vertical-align: top; }
+/* L'identifiant de ligne est un `<th scope="row">` — c'est lui qui nomme la ligne
+   pour un lecteur d'écran. Mais c'est une donnée, pas un en-tête de colonne : il
+   ne doit prendre ni les capitales, ni le gris, ni la bordure renforcée du
+   `<thead>`, sinon un liseré plus clair apparaît sous chaque numéro. */
+.table tbody th {
+    text-align: left; font-weight: 400; color: var(--ink);
+    padding: 9px 12px; border-bottom: 1px solid rgba(58,50,37,.5);
+    vertical-align: top; white-space: nowrap;
+}
+.table tbody tr:last-child th, .table tbody tr:last-child td { border-bottom: 0; }
+.table tbody tr:hover th, .table tbody tr:hover td { background: rgba(201,162,75,.06); }
 .nowrap { white-space: nowrap; }
 .ellipsis { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-soft); }
-.tag { background: #2f2717; color: var(--gold-soft); padding: 2px 9px; border-radius: 20px; font-size: 12px; border: 1px solid var(--border); }
+.tag { display: inline-block; background: #2f2717; color: var(--gold-soft); padding: 2px 9px; border-radius: 20px;
+    font-size: 12px; border: 1px solid var(--border-strong); white-space: nowrap; }
 .count { margin: 4px 0 12px; }
-.empty { padding: 30px; text-align: center; }
-.pager { display: flex; gap: 14px; align-items: center; justify-content: center; margin-top: 18px; }
+/* `.empty-state` et non `.empty` : cette dernière sert déjà à `.status-badge.empty`
+   (un réglage non renseigné, dans les Paramètres). La collision existait déjà mais
+   ne se voyait pas — jusqu'à ce que ce bloc reçoive une bordure, qui encadrait
+   soudain la pastille « Non enregistré ». */
+.empty-state {
+    padding: 40px 24px; text-align: center;
+    border: 1px dashed var(--border-strong); border-radius: var(--radius);
+    display: flex; flex-direction: column; align-items: center; gap: 14px;
+}
+.empty-state p { margin: 0; }
+.pager { display: flex; gap: 14px; align-items: center; justify-content: center; margin-top: 18px; flex-wrap: wrap; }
 
-/* --- Détail --- */
-.meta-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
-@media (max-width: 700px) { .meta-grid { grid-template-columns: 1fr; } }
+/* --- Détail ---
+   `minmax(0, 1fr)` et non `1fr` : un nom de fichier XML sans espace refusait de
+   se réduire et faisait déborder la carte. */
+.meta-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px 14px; }
+@media (max-width: 700px) { .meta-grid { grid-template-columns: minmax(0, 1fr); } }
+.meta-grid { margin: 0; }
+.meta-grid > div { min-width: 0; overflow-wrap: anywhere; }
+/* `<dd>` arrive avec `margin-left: 40px` du navigateur : sans ce remise à zéro,
+   chaque valeur était décalée de 40 px sous son étiquette. */
+.meta-grid dd { margin: 0; }
 .meta-grid .k { display: block; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 3px; }
-.text-block { white-space: pre-wrap; line-height: 1.7; }
+/* `pre-wrap` conserve les retours à la ligne du texte injecté ; `anywhere` évite
+   qu'une URL ou un mot très long déborde quand même de la carte. */
+.text-block { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; }
 .code { white-space: pre; overflow-x: auto; font-family: ui-monospace, Consolas, monospace; font-size: 13px; color: var(--ink-soft); }
+/* Fil d'Ariane du détail : un simple lien de retour, mais il doit respirer. */
+.back-link { margin: 0 0 18px; }
+/* Ligne d'actions (téléchargement du PDF + chemin) : le chemin ne doit pas
+   pousser le bouton hors de la carte sur un écran étroit. */
+.detail-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 16px 0; }
+.detail-actions .muted { font-size: 12px; overflow-wrap: anywhere; min-width: 0; }
 
-/* --- Paramètres --- */
-.setting { display: grid; grid-template-columns: 220px 1fr 200px; gap: 14px; align-items: center;
-    padding: 10px; border-radius: 8px; margin: 6px 0; }
-@media (max-width: 760px) { .setting { grid-template-columns: 1fr; gap: 6px; } }
-.setting.error { background: rgba(207,106,90,.07); }
+/* --- Paramètres ---
+   Les trois colonnes gardent leur alignement, mais la ligne se signale au survol
+   et le champ en défaut porte un liseré : sur une liste d'une dizaine de réglages,
+   un fond teinté à 7 % ne suffisait pas à repérer celui qui coince. */
+.setting { display: grid; grid-template-columns: minmax(180px, 220px) 1fr minmax(160px, 210px); gap: 14px;
+    align-items: center;
+    padding: 10px; border-radius: 8px; margin: 6px 0;
+    border-left: 3px solid transparent; }
+@media (max-width: 860px) { .setting { grid-template-columns: 1fr; gap: 6px; align-items: stretch; } }
+.setting:hover { background: rgba(201,162,75,.04); }
+.setting.error { background: rgba(213,119,106,.07); border-left-color: var(--red); }
+.setting.ok { border-left-color: rgba(127,174,107,.45); }
 .setting-label { font-size: 13px; }
-.setting-label code { display: block; margin-top: 3px; }
-.req { color: var(--red); }
-.status-badge { font-size: 12px; }
+.setting-label code { display: block; margin-top: 3px; word-break: break-all; }
+.req { color: var(--red); font-weight: 700; }
+.status-badge { font-size: 12px; display: inline-flex; align-items: baseline; gap: 6px; }
 .status-badge.ok { color: var(--green); }
 .status-badge.error { color: var(--red); }
 .status-badge.empty { color: var(--muted); }
+/* Le chemin du fichier de configuration peut être long ; sur mobile il débordait. */
+.settings-note code { word-break: break-all; }
+/* Une classe suffit à battre le sélecteur de type `small` : pas d'`!important`. */
+.unsaved { color: var(--amber); }
 
 /* --- Carte des touches --------------------------------------------------------
    Le châssis reste « grimoire » (cartes, or, serif). Les couleurs des keycaps,
@@ -236,16 +522,37 @@ code { background: #100d09; padding: 1px 6px; border-radius: 5px; color: var(--g
    retranchés, qui couvrent les marges et la barre de défilement — `100vw`
    l'inclut. Vérifié de 768 à 1920 px : la carte tient toujours.
 
-   `overflow-x: auto` reste un filet de sécurité, pas le fonctionnement nominal.
-   Il ne se déclenche qu'en dessous de ~470 px, où le clavier est de toute façon
-   inutilisable. */
+   `overflow-x: auto` reste un filet de sécurité au-dessus de ~900 px, mais devient
+   le fonctionnement nominal en dessous — voir le plancher ci-dessous.
+
+   Le plancher était à 18 px. Conséquence non voulue : sur un téléphone (390 px),
+   le clavier *tenait* — en keycaps de 18 px, dont les libellés tombaient à 8 px et
+   n'étaient plus lisibles. Le filet de sécurité ne se déclenchait donc jamais, et
+   l'on obtenait une carte illisible plutôt qu'une carte lisible qui défile. À
+   34 px les libellés restent déchiffrables et le bloc défile latéralement dans son
+   propre cadre, sans jamais faire défiler la page. */
 .keymap-board {
-    --key-u: clamp(18px, calc((100vw - 90px) / 24), 52px);
+    --key-u: clamp(34px, calc((100vw - 90px) / 24), 52px);
     --key-gap: clamp(3px, calc(var(--key-u) * 0.11), 5px);
     --key-h: calc(var(--key-u) * 1.08);
 
     display: flex; align-items: flex-start; gap: calc(var(--key-u) * 0.5);
     overflow-x: auto;
+    /* Même raison que `.table-wrap` : bloc conteneur des éléments absolus internes,
+       pour qu'ils ne s'échappent pas du défilement local. */
+    position: relative;
+    /* Défilement au doigt franc, sans blocage à mi-course. */
+    overscroll-behavior-x: contain;
+    padding-bottom: 6px;    /* place pour la barre de défilement quand elle apparaît */
+}
+.keymap-board:focus-visible { outline: 2px solid var(--gold); outline-offset: 4px; }
+
+/* Le défilement latéral du clavier n'est annoncé nulle part : sous ~900 px la
+   carte est plus large que l'écran, et rien ne le dit. Le seuil est celui où le
+   plancher de `--key-u` (34 px) prend le dessus sur le calcul de largeur. */
+.board-hint { display: none; }
+@media (max-width: 900px) {
+    .board-hint { display: block; margin: -8px 0 12px; }
 }
 
 /* Les blocs ne se compriment pas : les keycaps ont une largeur fixe (`flex: 0 0`),
@@ -276,7 +583,11 @@ code { background: #100d09; padding: 1px 6px; border-radius: 5px; color: var(--g
     transition: filter .12s, box-shadow .12s;
 }
 .keycap:hover { filter: brightness(1.25); }
-.keycap:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(201,162,75,.45); }
+/* Le focus était un `box-shadow` doré — exactement ce que porte `.keycap.hit`
+   (résultat de recherche). Au clavier, impossible de distinguer « je suis ici » de
+   « ceci correspond au filtre ». Le focus passe donc sur `outline`, qui se
+   superpose au liseré de `.hit` sans le remplacer. */
+.keycap:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; z-index: 1; }
 /* Enfoncement : la touche descend et son socle s'écrase. */
 .keycap:active { transform: translateY(1px); border-bottom-width: 2px; }
 .keycap.free { opacity: .75; }
@@ -320,10 +631,15 @@ code { background: #100d09; padding: 1px 6px; border-radius: 5px; color: var(--g
 .key-editor:empty { display: none; }
 .key-editor {
     position: fixed; right: 26px; bottom: 26px; z-index: 20; width: 380px; max-width: calc(100vw - 32px);
+    /* Le panneau est haut (action + familles + mémo) : sur un écran bas il
+       dépassait en haut sans possibilité de le faire défiler. */
+    max-height: calc(100vh - 52px); overflow-y: auto;
 }
 .key-editor-panel {
     background: linear-gradient(180deg, var(--panel), var(--bg-2));
-    border: 1px solid var(--border); border-radius: var(--radius);
+    /* Contour renforcé : le panneau flotte au-dessus de la carte des touches, sa
+       limite doit se lire même par-dessus un keycap clair. */
+    border: 1px solid var(--border-strong); border-radius: var(--radius);
     padding: 16px 18px 18px; box-shadow: 0 10px 34px rgba(0,0,0,.55);
 }
 .editor-head { display: flex; align-items: center; gap: 12px; }
@@ -339,9 +655,12 @@ code { background: #100d09; padding: 1px 6px; border-radius: 5px; color: var(--g
 .editor-code code { font-size: 11px; }
 .editor-close { margin-left: auto; padding: 4px 9px; }
 
-/* --- Pastilles de famille --- */
-.pill-block { margin: 14px 0; }
-.pill-legend { display: block; font-size: 13px; color: var(--ink-soft); margin-bottom: 7px; }
+/* --- Pastilles de famille ---
+   `.pill-block` est un `<fieldset>` (le groupe de radios a besoin d'un nom
+   accessible) : il faut donc défaire le cadre et les marges que le navigateur y
+   met d'office, sinon un liseré gris apparaît autour du bloc. */
+.pill-block { margin: 14px 0; padding: 0; border: 0; min-width: 0; }
+.pill-legend { display: block; padding: 0; font-size: 13px; color: var(--ink-soft); margin-bottom: 7px; }
 .pills { display: flex; flex-wrap: wrap; gap: 6px; }
 .pill { position: relative; margin: 0; cursor: pointer; }
 .pill input { position: absolute; opacity: 0; width: 0; height: 0; }
@@ -373,9 +692,18 @@ code { background: #100d09; padding: 1px 6px; border-radius: 5px; color: var(--g
    pas configurée : la SPA ne recharge plus, il faut un signal persistant. */
 .config-banner { margin: 0 auto; max-width: 1100px; padding: 0 24px; }
 .config-banner .alert { margin-top: 18px; }
+@media (max-width: 480px) { .config-banner { padding: 0 16px; } }
 
 /* Recherche de l'historique : la saisie est débouncée, on le montre. */
 .filters .searching { color: var(--gold-soft); }
+/* L'indicateur apparaît puis disparaît à côté du libellé. En flux normal il
+   décalait le champ de quelques pixels à chaque frappe ; sorti du flux, il ne
+   bouge plus rien. */
+.field-hint {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11px; font-weight: 400; text-transform: none; letter-spacing: 0;
+    margin-left: 8px;
+}
 
 /* Carte des touches : filtre par famille et recherche d'action, impossibles à
    rendre agréables tant que chaque interaction repartait au serveur. */
@@ -389,14 +717,34 @@ code { background: #100d09; padding: 1px 6px; border-radius: 5px; color: var(--g
 .keymap-toolbar .grow { flex: 1; min-width: 200px; }
 .keymap-toolbar label { margin: 0; }
 
-/* Touche estompée parce qu'elle ne correspond pas au filtre courant. */
-.keycap.dimmed { opacity: .18; }
+/* Touche estompée parce qu'elle ne correspond pas au filtre courant.
+   `.18` rendait le libellé illisible : la touche restait cliquable mais on ne
+   savait plus laquelle on allait ouvrir. `.28` suffit à la faire reculer. */
+.keycap.dimmed { opacity: .28; }
 .keycap.hit { box-shadow: 0 0 0 2px var(--gold); }
 
-/* Pastille de famille cliquable dans la légende (filtre). */
-.legend-item.filterable { cursor: pointer; border-radius: 20px; padding: 2px 8px; margin: -2px -8px; }
-.legend-item.filterable:hover { background: rgba(201,162,75,.08); }
-.legend-item.active { background: rgba(201,162,75,.14); color: var(--ink); }
+/* Pastille de famille cliquable dans la légende (filtre). C'est un vrai <button>
+   côté page ; il faut donc neutraliser l'habillage natif. */
+.legend-item.filterable {
+    cursor: pointer; border-radius: 20px; padding: 3px 9px; margin: -3px -9px;
+    background: none; border: 0; color: inherit;
+    font: inherit; font-size: 12px;
+    transition: background .12s, color .12s;
+}
+.legend-item.filterable:hover { background: rgba(201,162,75,.08); color: var(--ink); }
+.legend-item.active { background: rgba(201,162,75,.16); color: var(--ink); }
+/* La famille filtrée se signale aussi par sa pastille, pas seulement par le fond
+   du bouton : sur un bandeau de huit familles, un fond à 16 % se repère mal. */
+.legend-item.active .legend-chip { box-shadow: 0 0 0 2px var(--gold); }
+
+/* Aucune touche ne correspond au filtre : la carte entière était simplement
+   estompée, sans un mot — indiscernable d'un rendu qui a mal tourné. */
+.keymap-empty {
+    margin: 0 0 16px; padding: 12px 16px;
+    border: 1px dashed var(--border-strong); border-radius: 8px;
+    font-size: 13px;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
 
 /* Page introuvable. */
 .notfound { text-align: center; padding: 60px 20px; }
