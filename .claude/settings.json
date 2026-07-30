@@ -64,7 +64,8 @@
       "Bash(docker build *)",
       "Bash(APP_HOST=exemple.duckdns.org docker compose config)",
       "Bash(git checkout *)",
-      "Bash(git merge --no-ff refactor/backend-frontend-split -m 'Merge : refactor backend/frontend *)"
+      "Bash(git merge --no-ff refactor/backend-frontend-split -m 'Merge : refactor backend/frontend *)",
+      "Bash(git fetch *)"
     ]
   }
 }
