@@ -34,6 +34,12 @@ Catégories utilisées : **Ajouté**, **Modifié**, **Corrigé**, **Supprimé**,
       ou de mémo, instantanés — l'état complet arrive en un appel, là où l'ancienne
       interface rechargeait le clavier au serveur à chaque édition.
     - Le **sélecteur de date calcule tout localement**, bornes du mois comprises.
+    - La **carte des touches occupe toute la largeur**, hors du cadre de carte qui
+      la rétrécissait. La taille d'une touche se calcule depuis la largeur
+      disponible (`clamp`), d'après le total mesuré de la disposition
+      (23,77 unités) : plus de défilement horizontal de 1920 jusqu'à 500 px, là
+      où l'ancienne mise en page débordait dès 1100 px. Les libellés suivent la
+      taille de la touche, sans quoi ils débordaient sous ~40 px.
   - **Déploiement séparé en deux conteneurs** derrière Traefik, sur le même host :
     `PathPrefix(/api)` (priorité 100) vers le backend, catch-all (priorité 1) vers
     le frontend. Le navigateur reste donc en **same-origin** — aucune configuration

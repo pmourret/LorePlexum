@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 
 import { useHealth } from '../api/hooks'
 
@@ -10,6 +10,16 @@ const NAV = [
 ]
 
 /**
+ * Routes qui lèvent la largeur maximale de 1100 px.
+ *
+ * La carte des touches fait à elle seule ~1100 px : contrainte, elle défilait
+ * horizontalement. La liste est ici plutôt que dans la page parce que c'est le
+ * `<main>` du Layout qui porte la contrainte — une page ne peut pas la relâcher
+ * depuis l'intérieur sans bricolage `100vw`, qui compte la barre de défilement.
+ */
+const WIDE_ROUTES = ['/keys']
+
+/**
  * Châssis commun : bandeau, navigation, pied de page.
  *
  * Il porte aussi l'alerte de configuration. Dans l'ancienne interface, chaque
@@ -19,7 +29,9 @@ const NAV = [
  */
 export default function Layout() {
   const health = useHealth()
+  const { pathname } = useLocation()
   const unconfigured = health.data && !health.data.config_ok
+  const wide = WIDE_ROUTES.some((route) => pathname.startsWith(route))
 
   return (
     <>
@@ -59,7 +71,7 @@ export default function Layout() {
         </div>
       )}
 
-      <main className="content">
+      <main className={wide ? 'content content-wide' : 'content'}>
         <Outlet />
       </main>
 

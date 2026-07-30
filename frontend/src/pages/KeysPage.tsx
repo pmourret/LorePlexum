@@ -37,7 +37,7 @@ export default function KeysPage() {
         n'est lu ni écrit côté jeu : c'est une carte, pas un outil de remappage.
       </p>
 
-      <div className="card keymap-card">
+      <div className="keymap-surface">
         <Keyboard
           keymap={keymap.data}
           filterCat={filterCat}

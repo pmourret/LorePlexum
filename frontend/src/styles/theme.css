@@ -64,6 +64,13 @@ body {
 
 /* --- Contenu --- */
 .content { max-width: 1100px; margin: 28px auto; padding: 0 24px; }
+
+/* Pages qui ont besoin de toute la largeur (la carte des touches). La contrainte
+   est levée ici plutôt que contournée dans la page : un `margin-left: calc(50% -
+   50vw)` aurait marché, mais `100vw` inclut la barre de défilement et provoque
+   un débordement horizontal de quelques pixels — exactement ce qu'on cherche à
+   supprimer. */
+.content-wide { max-width: none; }
 h1 { font-family: var(--serif); color: var(--gold-soft); font-weight: 600; margin: 0 0 20px; }
 h2 { font-family: var(--serif); color: var(--gold-soft); font-size: 18px; margin: 26px 0 10px; }
 h3 { font-size: 14px; color: var(--ink-soft); }
@@ -208,9 +215,42 @@ code { background: #100d09; padding: 1px 6px; border-radius: 5px; color: var(--g
 .keys-head h1 { margin-bottom: 0; }
 .keys-intro { max-width: 760px; margin: 10px 0 20px; font-size: 13px; }
 
-/* Le clavier a une largeur minimale : on le laisse défiler plutôt que le tasser. */
-.keymap-card { overflow-x: auto; }
-.keymap-board { display: flex; align-items: flex-start; gap: 26px; min-width: max-content; }
+/* La carte n'est plus dans une carte : elle occupe la largeur de la page, sans
+   cadre ni fond. Le clavier EST le contenu de cette page, l'encadrer le
+   rétrécissait pour rien. */
+.keymap-surface { margin-top: 4px; }
+
+/* Le clavier doit tenir sans défilement horizontal. L'unité de touche est donc
+   calculée depuis la largeur disponible plutôt que fixée.
+
+   Le diviseur vient de la disposition réelle, mesurée et non estimée :
+
+     rangée la plus large  14,9 u  (chiffres : 13 touches + Retour 1,9)
+     pavé numérique         3,0 u
+     souris                 3,0 u
+     ------------------------------
+     total                 20,9 u  + 17 gouttières (0,11 u) + 2 écarts de bloc (0,5 u)
+     largeur         = 23,77 u + 48 px de marges de page
+
+   D'où le diviseur 24 (au-dessus de 23,77, donc du bon côté) et les 90 px
+   retranchés, qui couvrent les marges et la barre de défilement — `100vw`
+   l'inclut. Vérifié de 768 à 1920 px : la carte tient toujours.
+
+   `overflow-x: auto` reste un filet de sécurité, pas le fonctionnement nominal.
+   Il ne se déclenche qu'en dessous de ~470 px, où le clavier est de toute façon
+   inutilisable. */
+.keymap-board {
+    --key-u: clamp(18px, calc((100vw - 90px) / 24), 52px);
+    --key-gap: clamp(3px, calc(var(--key-u) * 0.11), 5px);
+    --key-h: calc(var(--key-u) * 1.08);
+
+    display: flex; align-items: flex-start; gap: calc(var(--key-u) * 0.5);
+    overflow-x: auto;
+}
+
+/* Les blocs ne se compriment pas : les keycaps ont une largeur fixe (`flex: 0 0`),
+   un bloc rétréci les rognerait au lieu de les redimensionner. */
+.board { flex: 0 0 auto; }
 .board-title {
     font-size: 10px; color: var(--muted); text-transform: uppercase;
     letter-spacing: 2px; margin-bottom: 8px; padding-left: 2px;
@@ -242,9 +282,16 @@ code { background: #100d09; padding: 1px 6px; border-radius: 5px; color: var(--g
 .keycap.free { opacity: .75; }
 .keycap.bound { box-shadow: 0 1px 6px rgba(0,0,0,.4); }
 
-.cap-legend { font-size: 12px; line-height: 1.1; }
+/* Les libellés suivent la taille de la touche : figés, ils débordaient dès que
+   l'unité descendait sous ~40 px. */
+.cap-legend {
+    font-size: clamp(8px, calc(var(--key-u) * 0.26), 13px);
+    line-height: 1.1;
+    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .cap-action {
-    font-size: 8.5px; line-height: 1.15; opacity: .85;
+    font-size: clamp(6px, calc(var(--key-u) * 0.185), 10px);
+    line-height: 1.15; opacity: .85;
     max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .keycap.bound .cap-legend { font-weight: 600; }
@@ -333,8 +380,11 @@ code { background: #100d09; padding: 1px 6px; border-radius: 5px; color: var(--g
 /* Carte des touches : filtre par famille et recherche d'action, impossibles à
    rendre agréables tant que chaque interaction repartait au serveur. */
 .keymap-toolbar {
-    display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center;
-    margin-bottom: 16px;
+    display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end;
+    /* La page est pleine largeur, pas le champ de recherche : étiré sur 1300 px
+       il serait ridicule, et la cible de clic n'y gagne rien. */
+    max-width: 620px;
+    margin-bottom: 18px;
 }
 .keymap-toolbar .grow { flex: 1; min-width: 200px; }
 .keymap-toolbar label { margin: 0; }
