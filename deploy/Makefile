@@ -21,8 +21,16 @@ MOUNT     := /mnt/TakeNotes
 NETWORK   := proxy
 STAMP     := $(shell date +%Y%m%d-%H%M%S)
 
+# Variables qui DOIVENT pointer dans le volume persistant /data, avec la valeur
+# attendue. Une seule liste, lue par `check` (qui la vérifie) et par `migrate`
+# (qui complète un app.env antérieur) : ajouter une variable ici suffit.
+DATA_VARS := \
+	DATABASE_PATH=/data/injections.db \
+	KEYBINDS_DB_PATH=/data/keybinds.db \
+	CONFIG_ENV_PATH=/data/app.env
+
 .DEFAULT_GOAL := help
-.PHONY: help init check build up deploy recreate down restart logs ps shell backup
+.PHONY: help init migrate check build up deploy recreate down restart logs ps shell backup
 
 help: ## Affiche cette aide
 	@echo "LorePlexum — déploiement (hiatus)"
@@ -44,6 +52,30 @@ init: ## Crée .env et app.env depuis les .example (n'écrase jamais l'existant)
 	@echo
 	@echo "Éditez maintenant .env (APP_HOST) et app.env (chemins), puis : make check"
 
+migrate: ## Complète un app.env antérieur avec les variables /data manquantes
+	@[ -f app.env ] || { echo "app.env manquant — lancez 'make init'."; exit 1; }
+	@cp app.env app.env.bak-$(STAMP)
+	@# Un fichier sans saut de ligne final collerait l'ajout à la dernière ligne,
+	@# produisant un `...keybinds.dbCONFIG_ENV_PATH=...` que ni grep ni Docker
+	@# Compose ne savent lire — et l'erreur serait silencieuse.
+	@[ -n "$$(tail -c1 app.env)" ] && printf '\n' >> app.env || true
+	@added=0; \
+	for pair in $(DATA_VARS); do \
+		v=$${pair%%=*}; \
+		if grep -q "^$$v=/data/" app.env; then \
+			echo "  = $$v déjà correct"; \
+		elif grep -q "^$$v=" app.env; then \
+			echo "  ! $$v présent mais hors de /data — corrigez-le à la main :"; \
+			echo "        valeur attendue : $$pair"; \
+		else \
+			printf '%s\n' "$$pair" >> app.env; \
+			echo "  + $$pair ajouté"; added=1; \
+		fi; \
+	done; \
+	[ $$added -eq 1 ] && echo && echo "Sauvegarde : app.env.bak-$(STAMP)" || true
+	@echo
+	@echo "Relancez 'make check'."
+
 check: ## Vérifie les prérequis avant déploiement (montage, réseau, variables)
 	@ok=0; \
 	for f in .env app.env; do \
@@ -58,10 +90,13 @@ check: ## Vérifie les prérequis avant déploiement (montage, réseau, variable
 		for v in FULL_CONTEXT_JSON_PATH ENTRIES_DIR TAKE_NOTES_EXPORT_DIR; do \
 			grep -q "^$$v=.\+" app.env || { echo "  ✗ $$v vide dans app.env"; ok=1; }; \
 		done; \
-		for v in DATABASE_PATH KEYBINDS_DB_PATH CONFIG_ENV_PATH; do \
+		for pair in $(DATA_VARS); do \
+			v=$${pair%%=*}; \
 			grep -q "^$$v=/data/" app.env \
-				|| { echo "  ✗ $$v absent ou hors de /data dans app.env :"; \
-				     echo "      le fichier serait créé dans l'image et perdu au prochain build"; ok=1; }; \
+				|| { echo "  ✗ $$v absent ou hors de /data dans app.env — ajoutez :"; \
+				     echo "        $$pair"; \
+				     echo "      sinon le fichier est créé DANS L'IMAGE et perdu au prochain build"; \
+				     echo "      ('make migrate' ajoute les lignes manquantes)"; ok=1; }; \
 		done; \
 	fi; \
 	mountpoint -q $(MOUNT) 2>/dev/null \
@@ -83,7 +118,13 @@ build: ## Reconstruit les images sans démarrer
 	$(COMPOSE) build
 
 up: check ## Démarre (ou met à jour) la stack après reconstruction
-	$(COMPOSE) up -d --build
+	@# --remove-orphans : le service `tnfc` d'avant le refactor a été remplacé par
+	@# `backend` + `frontend`. Sans cette option, son conteneur survit au
+	@# déploiement — et comme Traefik lit les labels des conteneurs EN COURS
+	@# D'EXÉCUTION, son router se dispute `Host(APP_HOST)` avec le nouveau
+	@# frontend. Le symptôme est déroutant : l'ancienne interface répond encore,
+	@# par intermittence.
+	$(COMPOSE) up -d --build --remove-orphans
 	@echo
 	@host=$$(grep '^APP_HOST=' .env | cut -d= -f2-); \
 	 echo "  SPA : https://$$host/"; \
@@ -95,7 +136,7 @@ deploy: ## Met à jour depuis git puis redéploie (flux de mise à jour nominal)
 	@$(MAKE) up
 
 recreate: ## Recrée les conteneurs de force — requis après un changement de label Traefik
-	$(COMPOSE) up -d --build --force-recreate
+	$(COMPOSE) up -d --build --force-recreate --remove-orphans
 
 down: ## Arrête et supprime les conteneurs (le volume de données est conservé)
 	$(COMPOSE) down

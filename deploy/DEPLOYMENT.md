@@ -140,21 +140,34 @@ make deploy                   # git pull + check + up -d --build
 Le volume `tnfc-data` (bases SQLite) et les fichiers sur auditus survivent aux
 reconstructions.
 
-> **Migrations à faire une fois** sur un `deploy/app.env` existant — `make check`
-> refuse de déployer tant qu'elles manquent :
+> **Migration d'un `app.env` antérieur** — `make check` refuse de déployer tant
+> qu'il manque une variable pointant dans `/data` :
 >
-> - `KEYBINDS_DB_PATH=/data/keybinds.db` (carte des touches) ;
-> - `CONFIG_ENV_PATH=/data/app.env` (refactor backend/frontend). Sans cette ligne,
->   la page Paramètres écrit **dans la couche d'image** et les chemins saisis
->   depuis l'interface sont perdus à la reconstruction suivante.
+> ```bash
+> cd deploy
+> make migrate     # ajoute les lignes manquantes (sauvegarde app.env.bak-<horodatage>)
+> make check
+> ```
 >
-> Dans les deux cas, le fichier est sinon créé dans l'image (`/app/data`) et repart
-> de zéro à chaque `--build`.
+> | Variable | Apparue avec | Sans elle |
+> |---|---|---|
+> | `KEYBINDS_DB_PATH=/data/keybinds.db` | carte des touches | la carte repart de zéro à chaque build |
+> | `CONFIG_ENV_PATH=/data/app.env` | refactor backend/frontend | les chemins saisis dans **Paramètres** sont perdus à chaque build |
+>
+> Dans les deux cas, le fichier est sinon créé **dans la couche d'image**
+> (`/app/data`) et disparaît au prochain `--build`. `make migrate` est idempotent ;
+> il ne touche pas à une variable déjà présente mais mal placée, qu'il signale.
 
-> **Reconstruction complète requise** au passage à cette version : le service
-> `tnfc` est remplacé par `backend` + `frontend`. Faites `make down` puis
-> `make up` — `docker compose` ne supprime pas l'ancien conteneur tout seul si son
-> nom de service a disparu. Le volume `tnfc-data` est conservé.
+> **Passage du service unique aux deux services** : `tnfc` est remplacé par
+> `backend` + `frontend`. `make up` et `make recreate` passent `--remove-orphans`
+> pour supprimer l'ancien conteneur `loreplexum-injector`. C'est nécessaire, pas
+> cosmétique : Traefik lit les labels des conteneurs **en cours d'exécution**, donc
+> un `loreplexum-injector` survivant continuerait à revendiquer `Host(APP_HOST)`
+> en concurrence du nouveau frontend — l'ancienne interface répondrait encore, par
+> intermittence. Le volume `tnfc-data` est conservé.
+>
+> Si vous lancez `docker compose up -d` à la main plutôt que par le Makefile,
+> pensez à ajouter `--remove-orphans`.
 
 ---
 

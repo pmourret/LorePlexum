@@ -47,6 +47,16 @@ Catégories utilisées : **Ajouté**, **Modifié**, **Corrigé**, **Supprimé**,
     - `deploy/Makefile` : `make logs|shell|restart S=<service>` pour cibler un seul
       conteneur ; `make check` rappelle que l'accès n'est pas authentifié.
   - `run_web.ps1` devient `run_dev.ps1` et lance les deux serveurs.
+  - `make migrate` : complète un `deploy/app.env` antérieur avec les variables
+    qui doivent pointer dans le volume `/data`, après sauvegarde horodatée.
+    Idempotent, et tolérant à un fichier sans saut de ligne final — sans quoi
+    l'ajout se collait à la dernière ligne et produisait une variable illisible
+    par `grep` comme par Docker Compose, en silence. `make check` nomme désormais
+    la ligne exacte à ajouter au lieu de décrire le problème.
+  - `make up` et `make recreate` passent `--remove-orphans` : le conteneur du
+    service `tnfc` disparu survivait au déploiement et, Traefik lisant les labels
+    des conteneurs en cours d'exécution, son router se disputait `Host(APP_HOST)`
+    avec le nouveau frontend.
   - **API JSON versionnée `/api/v1`**, documentée sur `/api/docs` (OpenAPI sur
     `/api/openapi.json`) : santé, catégories, arcs, métadonnées, calendrier,
     injections (création, historique paginé, détail, PDF), carte des touches,
