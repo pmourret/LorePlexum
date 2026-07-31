@@ -56,6 +56,12 @@ class KeyBindWrite(BaseModel):
 
 class KeyboardLayoutOut(BaseModel):
     rows: list[list[Key]]
+    # Sans valeur par défaut, comme `rows` et `numpad` : un défaut rendrait le champ
+    # facultatif dans le contrat OpenAPI, et le client devrait traiter un cas
+    # d'absence que le serveur ne produit jamais.
+    navigation: list[list[Key]] = Field(
+        description="Bloc Inser/Suppr/Début/Fin/pages et flèches directionnelles",
+    )
     numpad: list[list[Key]]
     mouse_buttons: list[Key]
     mouse_side: list[Key]

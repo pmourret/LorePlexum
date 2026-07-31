@@ -94,11 +94,41 @@ _ROWS_RAW = [
 # comme sur le pavé physique ; les rangées qu'elles traversent n'ont donc que trois
 # touches, et la grille CSS place le reste par elle-même.
 _NUMPAD_RAW = [
-    [(69, "Verr Num"), (181, "/"), (55, "*"), (74, "-")],
+    # « Num » et non « Verr Num » : la touche fait 1 unité, et « Verr Num » y était
+    # rogné en « Verr … ». Aucune ambiguïté pour autant — l'autre verrou porte
+    # « Verr Maj », et celui-ci est dans le bloc du pavé.
+    [(69, "Num"), (181, "/"), (55, "*"), (74, "-")],
     [(71, "7"), (72, "8"), (73, "9"), (78, "+", 1, 2)],
     [(75, "4"), (76, "5"), (77, "6")],
     [(79, "1"), (80, "2"), (81, "3"), (156, "Entrée", 1, 2)],
     [(82, "0", 2), (83, ".")],
+]
+
+# Bloc de navigation : Inser / Suppr / Début / Fin / pages, et les flèches.
+#
+# Dix touches qui manquaient entièrement — donc invisibles et non assignables — alors
+# qu'elles sont presque toutes libres sur un mapping Skyrim, ce qui en fait les
+# meilleures candidates pour un nouveau bind.
+#
+# ATTENTION, et c'est le piège que ce module existe pour désamorcer : ce sont des
+# touches « étendues ». Leur code vaut celui de la touche du pavé numérique située
+# à la même position physique, **plus 128** :
+#
+#     Début  199 = 71 + 128   (le « 7 » du pavé)
+#     ↑      200 = 72 + 128   (le « 8 »)
+#     Pg↑    201 = 73 + 128   (le « 9 »)
+#     Inser  210 = 82 + 128   (le « 0 »)
+#
+# Écrire 71 en croyant viser Début, c'est assigner le pavé numérique — une erreur
+# silencieuse, le mod répond simplement à la mauvaise touche.
+#
+# La rangée de la flèche haute n'a qu'une touche : le CSS la centre, ce qui la place
+# dans la colonne du milieu sans qu'aucune position n'ait à être écrite ici.
+_NAVIGATION_RAW = [
+    [(210, "Inser"), (199, "Début"), (201, "Pg↑")],
+    [(211, "Suppr"), (207, "Fin"), (209, "Pg↓")],
+    [(200, "↑")],
+    [(203, "←"), (208, "↓"), (205, "→")],
 ]
 
 # Souris. Les deux boutons latéraux sont nommés par leur **position physique**
@@ -123,13 +153,14 @@ def _expand(row):
 
 ROWS = [_expand(r) for r in _ROWS_RAW]
 NUMPAD = [_expand(r) for r in _NUMPAD_RAW]
+NAVIGATION = [_expand(r) for r in _NAVIGATION_RAW]
 MOUSE_BUTTONS = _expand(_MOUSE_BUTTONS_RAW)
 MOUSE_SIDE = _expand(_MOUSE_SIDE_RAW)
 
 
 def all_keys():
-    """Itère sur toutes les touches déclarées (clavier, pavé, souris)."""
-    for row in ROWS + NUMPAD:
+    """Itère sur toutes les touches déclarées (clavier, navigation, pavé, souris)."""
+    for row in ROWS + NAVIGATION + NUMPAD:
         yield from row
     yield from MOUSE_BUTTONS
     yield from MOUSE_SIDE

@@ -51,7 +51,50 @@ def test_numpad_exposes_every_physical_key_with_its_own_scan_code(client):
     # deux verrous entre eux : `legend_of` sert d'en-tête au panneau d'édition.
     assert keyboard.legend_of(28) == "Entrée" and keyboard.legend_of(156) == "Entrée"
     assert keyboard.legend_of(58) == "Verr Maj"
-    assert keyboard.legend_of(69) == "Verr Num"
+    assert keyboard.legend_of(69) == "Num"
+
+
+def test_navigation_block_uses_extended_scan_codes(client):
+    """Inser / Suppr / Début / Fin / pages et flèches, avec leurs codes étendus.
+
+    Ces dix touches manquaient elles aussi. Leur code n'est pas celui qu'on devine :
+    ce sont des touches « étendues », dont le code vaut celui de la touche du pavé
+    numérique à la même position physique **plus 128**. Écrire 71 en croyant viser
+    Début assigne en réalité le « 7 » du pavé — une erreur silencieuse, le mod
+    répond simplement à la mauvaise touche. Le test fige la règle, pas seulement les
+    valeurs : c'est elle qui évite de se tromper en ajoutant une touche.
+    """
+    layout = client.get(f"{BASE}/keymap").json()["layout"]
+    nav = {k["legend"]: k["code"] for row in layout["navigation"] for k in row}
+    numpad = {k["legend"]: k["code"] for row in layout["numpad"] for k in row}
+
+    assert nav == {
+        "Inser": 210, "Début": 199, "Pg↑": 201,
+        "Suppr": 211, "Fin": 207, "Pg↓": 209,
+        "↑": 200,
+        "←": 203, "↓": 208, "→": 205,
+    }
+    # Chaque touche de navigation est la jumelle étendue d'une touche du pavé.
+    for nav_legend, numpad_legend in [
+        ("Début", "7"), ("↑", "8"), ("Pg↑", "9"),
+        ("←", "4"), ("↓", "2"), ("→", "6"),
+        ("Fin", "1"), ("Pg↓", "3"), ("Inser", "0"), ("Suppr", "."),
+    ]:
+        assert nav[nav_legend] == numpad[numpad_legend] + 128, nav_legend
+
+    # La flèche haute est seule sur sa rangée : c'est ce qui permet au CSS de la
+    # centrer dans la colonne du milieu sans position codée en dur.
+    assert [len(row) for row in layout["navigation"]] == [3, 3, 1, 3]
+
+
+def test_every_declared_key_has_a_unique_scan_code():
+    """Deux touches partageant un code rendraient l'une des deux inassignable.
+
+    Le risque est réel : le pavé numérique et le bloc de navigation se ressemblent
+    à 128 près, et une faute de frappe y passerait inaperçue à l'œil nu.
+    """
+    codes = [k["code"] for k in keyboard.all_keys()]
+    assert len(codes) == len(set(codes))
 
 
 def test_keymap_is_seeded_with_the_default_mapping(client):

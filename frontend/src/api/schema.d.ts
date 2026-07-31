@@ -643,6 +643,11 @@ export interface components {
         KeyboardLayoutOut: {
             /** Rows */
             rows: components["schemas"]["Key"][][];
+            /**
+             * Navigation
+             * @description Bloc Inser/Suppr/Début/Fin/pages et flèches directionnelles
+             */
+            navigation: components["schemas"]["Key"][][];
             /** Numpad */
             numpad: components["schemas"]["Key"][][];
             /** Mouse Buttons */

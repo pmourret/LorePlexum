@@ -278,6 +278,19 @@ function Keyboard({
             ))}
           </div>
 
+          {/* Entre le clavier et le pavé, comme sur un clavier physique. Rangées
+              flex et non grille : la rangée de la flèche haute n'a qu'une touche,
+              que le CSS centre — elle tombe ainsi dans la colonne du milieu sans
+              qu'aucune position n'ait à être écrite. */}
+          <div className="board navcluster">
+            <div className="board-title">Navigation</div>
+            {keymap.layout.navigation.map((row, index) => (
+              <div className="key-row" key={index}>
+                {row.map(cap)}
+              </div>
+            ))}
+          </div>
+
           <div className="board numpad">
             <div className="board-title">Pavé</div>
             {/* Grille, et non des rangées flex comme le clavier : « + » et

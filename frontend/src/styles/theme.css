@@ -168,18 +168,19 @@ main.content:focus, main.content:focus-visible { outline: none; }
    Desserrée, et non levée. En `max-width: none`, le titre, l'introduction et la
    barre de recherche se collaient au bord gauche de l'écran pendant que le clavier,
    lui, est centré : sur un écran de 2560 px, près de 400 px séparaient le bord du
-   clavier de celui du texte qui le présente. 1840 px, c'est la largeur maximale que
-   la carte atteint (≈ 1780 px à 72 px l'unité) plus les marges de page : la page se
-   centre donc d'un bloc, et le clavier remplit presque tout ce bloc.
+   clavier de celui du texte qui le présente. 2100 px, c'est la largeur maximale que
+   la carte atteint (≈ 2040 px à 72 px l'unité, bloc de navigation compris) plus les
+   marges de page : la page se centre donc d'un bloc, et le clavier remplit presque
+   tout ce bloc. À réviser avec le diviseur si un bloc s'ajoute encore.
 
    « Presque » : il reste au clavier quelques pixels de jeu, que son propre centrage
-   répartit de part et d'autre — 5 px à 2560, 22 px à 1440. Le décalage entre le bord
+   répartit de part et d'autre. Le décalage entre le bord
    du titre et celui du clavier n'est donc pas nul, il est devenu optiquement
    invisible. L'annuler tout à fait demanderait de dimensionner la page sur le
    contenu (`width: fit-content`), ce qui ferait dépendre la largeur de la page de la
    largeur intrinsèque d'un conteneur qui défile — et casserait le cas mobile, où
    c'est précisément le débordement qui est voulu. */
-.content-wide { max-width: 1840px; }
+.content-wide { max-width: 2100px; }
 /* `2em` par défaut donnait 32 px, y compris sur un écran de 360 px de large où le
    titre passait sur trois lignes. */
 h1 {
@@ -527,16 +528,21 @@ code { background: #100d09; padding: 1px 6px; border-radius: 5px; color: var(--g
    Le diviseur vient de la disposition réelle, mesurée et non estimée :
 
      rangée la plus large  14,9 u  (chiffres : 13 touches + Retour 1,9)
+     navigation             3,0 u  (Inser/Début/Pg↑ et les flèches)
      pavé numérique         4,0 u  (Verr Num / * -, depuis l'ajout des opérateurs)
      souris                 3,0 u
      ------------------------------
-     total                 21,9 u  + 18 gouttières (0,11 u) + 2 écarts de bloc (0,5 u)
-     largeur         = 24,88 u + 48 px de marges de page
+     total                 24,9 u  + 20 gouttières (0,11 u) + 3 écarts de bloc (0,5 u)
+     largeur         = 28,60 u + 48 px de marges de page
 
-   D'où le diviseur 25 (au-dessus de 24,88, donc du bon côté) et les 90 px
+   D'où le diviseur 29 (au-dessus de 28,60, donc du bon côté) et les 90 px
    retranchés, qui couvrent les marges et la barre de défilement — `100vw`
-   l'inclut. Le pavé étant passé de 3 à 4 unités, le diviseur est monté de 24 à 25 :
-   le laisser à 24 aurait fait déborder la carte d'une unité entière.
+   l'inclut.
+
+   Ce diviseur suit la disposition et doit être recalculé à chaque bloc ajouté :
+   24 à l'origine, 25 quand le pavé est passé de 3 à 4 unités, 29 depuis le bloc de
+   navigation. L'oublier ne casse rien visiblement — la carte déborde simplement et
+   se met à défiler, ce qui passe pour un choix.
 
    Le plafond est à 72 px, contre 52 avant. 52 px bridait la carte à ~1250 px : sur
    un écran large elle flottait, minuscule, dans un tiers de la page. 72 px, c'est
@@ -550,7 +556,7 @@ code { background: #100d09; padding: 1px 6px; border-radius: 5px; color: var(--g
    34 px les libellés restent déchiffrables et le bloc défile latéralement dans son
    propre cadre, sans jamais faire défiler la page. */
 .keymap-board {
-    --key-u: clamp(34px, calc((100vw - 90px) / 25), 72px);
+    --key-u: clamp(34px, calc((100vw - 90px) / 29), 72px);
     --key-gap: clamp(3px, calc(var(--key-u) * 0.11), 7px);
     --key-h: calc(var(--key-u) * 1.08);
 
@@ -580,10 +586,10 @@ code { background: #100d09; padding: 1px 6px; border-radius: 5px; color: var(--g
 /* Le défilement latéral du clavier n'est annoncé nulle part : rien ne dit que la
    carte continue hors de l'écran. Le seuil n'est pas choisi au hasard — c'est la
    largeur à laquelle le plancher de `--key-u` (34 px) prend le dessus sur le
-   calcul : 22,9 × 34 + 18 × 3,74 ≈ 846 px de carte contre `100vw - 48` de place,
-   soit un débordement en dessous de ~894 px. */
+   calcul : 24,9 × 34 + 20 × 3,74 + 3 × 17 ≈ 972 px de carte contre `100vw - 48` de
+   place, soit un débordement en dessous de ~1020 px. */
 .board-hint { display: none; }
-@media (max-width: 890px) {
+@media (max-width: 1020px) {
     .board-hint { display: block; margin: -8px 0 12px; }
 }
 
@@ -594,9 +600,24 @@ code { background: #100d09; padding: 1px 6px; border-radius: 5px; color: var(--g
     font-size: 10px; color: var(--muted); text-transform: uppercase;
     letter-spacing: 2px; margin-bottom: 8px; padding-left: 2px;
 }
-.numpad, .mouse { padding-top: 26px; }
+.navcluster, .numpad, .mouse { padding-top: 26px; }
 .key-row { display: flex; gap: var(--key-gap); margin-bottom: var(--key-gap); }
 .mouse .key-row { justify-content: stretch; }
+
+/* Bloc de navigation. Le centrage fait tout le travail : les rangées pleines
+   (Inser/Début/Pg↑, les trois flèches basses) occupent déjà les 3 unités et ne
+   bougent pas, tandis que la rangée de la flèche haute, seule, se retrouve
+   exactement dans la colonne du milieu. Aucune position codée en dur.
+
+   L'écart avant les flèches reproduit celui du clavier physique — sans lui, les
+   six touches du haut et les flèches formeraient un pavé continu de 4 rangées où
+   l'œil ne distingue plus les deux groupes.
+
+   La rangée visée est désignée par ce qu'elle est — la seule qui ne porte qu'une
+   touche, la flèche haute — plutôt que par son rang (`nth-child(4)`, qui compte le
+   titre du bloc et se décalerait au moindre réagencement). */
+.navcluster .key-row { justify-content: center; }
+.navcluster .key-row:has(> .keycap:only-child) { margin-top: calc(var(--key-h) * 0.5); }
 
 /* --- Grille du pavé numérique -------------------------------------------------
    Le clavier principal est en rangées flex ; le pavé ne peut pas l'être. « + » et
@@ -655,7 +676,8 @@ code { background: #100d09; padding: 1px 6px; border-radius: 5px; color: var(--g
 .keycap.bound { box-shadow: 0 1px 6px rgba(0,0,0,.4); }
 
 /* Les libellés suivent la taille de la touche : figés, ils débordaient dès que
-   l'unité descendait sous ~40 px. */
+   l'unité descendait sous ~40 px.
+
    Les plafonds suivent celui de `--key-u` : bloqués à 13 et 10 px, les libellés
    flottaient au milieu de keycaps devenus deux fois plus grands — la carte était
    plus large sans être plus lisible, alors que c'est la lisibilité qu'on cherche. */

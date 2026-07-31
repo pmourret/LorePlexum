@@ -35,6 +35,7 @@ def get_keymap(keys_db: KeysDb) -> KeymapOut:
     return KeymapOut(
         layout=KeyboardLayoutOut(
             rows=[[Key(**k) for k in row] for row in keyboard.ROWS],
+            navigation=[[Key(**k) for k in row] for row in keyboard.NAVIGATION],
             numpad=[[Key(**k) for k in row] for row in keyboard.NUMPAD],
             mouse_buttons=[Key(**k) for k in keyboard.MOUSE_BUTTONS],
             mouse_side=[Key(**k) for k in keyboard.MOUSE_SIDE],

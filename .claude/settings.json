@@ -95,7 +95,10 @@
       "Bash(./.venv/Scripts/python.exe -m pytest tests -q)",
       "Bash(../.venv/Scripts/python.exe ../scripts/dump_openapi.py ./openapi.json)",
       "Bash(npx openapi-typescript *)",
-      "Bash(rm -f _k.mjs _n.mjs)"
+      "Bash(rm -f _k.mjs _n.mjs)",
+      "Bash(PYTHONIOENCODING=utf-8 ./.venv/Scripts/python.exe -c ' *)",
+      "Bash(node ./_v.mjs \"C:/Users/PIERRE~1/AppData/Local/Temp/claude/d--Projects-Python-TNFCDataInjector-v2/eecdad97-a892-413c-8745-d401a24a7c4e/scratchpad\")",
+      "Bash(node ./_t.mjs)"
     ]
   }
 }
